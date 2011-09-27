@@ -1,0 +1,35 @@
+DSP Boot
+-------
+
+Usage
+$dsp_bt <dsp image file>
+
+DSP boot application does the following
+(a) Checks if the DSP_READY is set
+(b) Parses the DSP binary file and loads into M2/DDR
+(c) Sets PPC Ready so that the DSP image executes
+(d) waits for HW semaphore 0 to be set to the value 0xfe
+(e) Clear the hw semaphore 0
+
+
+Dependencies
+- linux Heterogeneous manager driver 
+- linux IPC driver 
+both should be up before executing this application.
+- Linux Hugetlbfs subsystem
+
+
+DSP behaviour
+1. DSP after setting HW semaphore1, sends a MSG on Channel 0 to
+indicate that the DSP IPC is up. It then waits for further actions
+from Linux Side.
+
+
+Internals
+1. DSP Boot Application uses shamget to create a hugetlb of 16MB.
+Out of this area the pa_shared_area and dsp_shared_area is allocated.
+This is set in the shared control area structure before DSP is booted up.
+2. The shared memory ID is saved with the Heterogeneous manager, which can 
+later be retrieved by any other application which wants to work on the
+same shared area.
+
