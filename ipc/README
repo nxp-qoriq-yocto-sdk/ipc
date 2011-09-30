@@ -1,0 +1,66 @@
+This is the first release of the Heterogeneous IPC module.
+The IPC layer runs a library in user space which is compiled with a
+user space application.
+
+Directory Structure
+-------------------
+include	-	Include directory for IPC public and private header files
+lib	-	Source code of 	:IPC,
+				:user space ipc helper memory manager
+				:user space dma driver
+test	-	Reference Test application which uses IPC channels
+
+Compilation Procedure
+---------------------
+1. Set KERNEL_DIR as the path of linux soruce code
+2. Set CROSS_COMPILE as the <path of toolchain>/.../powerpc-linux-gnu-
+3. run make
+4. ipclib.a and ipc_test would be created
+	ipclib.a is the library which the ipc_test statically links to.
+
+BootArgs Required
+-----------------
+Please set the bootargs as shown as example:
+default_hugepagesz=16m
+hugepagesz=16m
+hugepages=10
+max_num_ipc_channels=64
+max_channel_depth=16
+
+Test Application
+----------------
+The Test application is run after the DSP image has been loaded by the
+dsp_bt application. To run the test execute the ipc_test application as
+
+$./ipc_test
+
+The Test is run with 6 channels, where for each pair
+of channels linux is producer and DSP is consumer
+For each of the channel pairs a seperate thread is started by the Linux test
+application.
+
+The channel pairs are
+2-3	Channel 2 is a MSG Channel where DSP is consumer
+	Channel 3 is a PTR Channel where Linux is consumer.
+
+	Linux sends a message on Channel 2, DSP returns back the pointer of the
+	message on channel 3.
+
+	On Channel 2, DSP recieves VIRQ
+	On Channel 3, Linux polls for recv pointer.
+
+4-5	Channel 4 is a PTR channel where Linux is a consumer.
+	Channel 5 is a MSG channel where DSP is a consumer.
+
+	Linux recieves a ptr on channel 4, copies the length number of characters
+	from the pointer into a local buffer and sends the buffer on to channel 5.
+
+	On Channel 4, Linux Polls
+	On Channel 5, DSP Polls
+
+6-7	Channel 6 is a TX Request Channel where Linux is producer.
+	Channel 7 is a PTR channel were linux is consumer.
+
+	Linux sends a dummy TX request fapi message a set of buffer using DMA.
+	DSP returns to linux a pointer which points to a memory location
+	containing first 16 bytes of fapi message and the first buffer.
