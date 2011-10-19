@@ -79,7 +79,7 @@ void *shm_ptov(void *ptr)
  * Return - On sucess, Aligned virtual address of allocated shared memory.
  *          On Failure, NULL.
  */
-void *shm_memalign(unsigned long size, unsigned long align)
+void *shm_memalign(size_t size, unsigned long align)
 {
 	memalign_req_t req;
 
@@ -100,7 +100,7 @@ void *shm_memalign(unsigned long size, unsigned long align)
  * Retruns - On sucess, virtual address of allocated shared memory.
  *           On Failure, NULL.
  */
-void *shm_alloc(unsigned long size)
+void *shm_alloc(size_t size)
 {
 	alloc_req_t req;
 
@@ -120,19 +120,21 @@ void *shm_alloc(unsigned long size)
  */
 void shm_free(void *ptr)
 {
-	ptr = shm_vtop(ptr);
-	if (!ptr)
+	unsigned long addr;
+	addr = (unsigned long)shm_vtop(ptr);
+	if (!addr)
 		return;
 
-	ioctl(fd, IOCTL_FSL_SHM_FREE, ptr);
+	ioctl(fd, IOCTL_FSL_SHM_FREE, &addr);
 }
 
 /*
  * shm_init - Initializses Application for using Shared Memory Allocator.
- * Returns - Zero, On sucess.
- *           less than Zero, on failure.
+ * dsp_shared_size[in] - dsp shared area size.
+ * Returns - On sucess, virtual address of shared memory.
+ *           On failure, NULL.
  */
-int shm_init(void)
+void *shm_init(size_t dsp_shared_size)
 {
 	int shmid;
 	unsigned long i;
@@ -141,7 +143,7 @@ int shm_init(void)
 	fd = open(DEV_FILE, O_RDONLY);
 	if (fd < 0) {
 		perror(DEV_FILE);
-		return fd;
+		return NULL;
 	}
 
 	shmid = shmget(LG_SHM_KEY, HUGE_PAGE_256M,
@@ -149,7 +151,7 @@ int shm_init(void)
 	if (shmid) {
 		perror("shmget");
 		close(fd);
-		return -1;
+		return NULL;
 	}
 
 	memset(&shm, 0, sizeof(shm_seg_t));
@@ -158,15 +160,13 @@ int shm_init(void)
 		perror("Shared memory attach failure");
 		shmctl(shmid, IPC_RMID, NULL);
 		close(fd);
-		return -1;
+		return NULL;
 	}
 
+	shm.size = HUGE_PAGE_256M - dsp_shared_size;
 	ioctl(fd, IOCTL_FSL_SHM_INIT, &shm);
 
-	shm.size = HUGE_PAGE_256M;
 	shm_init_done = TRUE;
 
-	printf("vaddr %#x paddr: %#x\n", shm.vaddr, shm.paddr);
-
-	return 0;
+	return shm.paddr;
 }

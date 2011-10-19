@@ -29,9 +29,9 @@
 
 void *shm_vtop(void *ptr);
 void *shm_ptov(void *ptr);
-void *shm_alloc(unsigned long size);
-void *shm_memalign(unsigned long size, unsigned long align);
+void *shm_alloc(size_t size);
+void *shm_memalign(size_t size, unsigned long align);
 void shm_free(void *ptr);
-int shm_init(void);
+void *shm_init(size_t dsp_shared_size);
 
 #endif

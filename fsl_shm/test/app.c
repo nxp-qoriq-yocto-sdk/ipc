@@ -34,7 +34,7 @@
 
 main(int argc, char *argv[], char *envp[])
 {
-	int ret;
+	void *ret;
 	unsigned int *ptr, *ptr1;
 	unsigned int *paddr, *vaddr;
 
@@ -45,8 +45,8 @@ main(int argc, char *argv[], char *envp[])
 	 * shm_init needs to be called, ONLY ONCE, during the initialization
 	 * of application.
 	 */
-	ret = shm_init();
-	if (ret) {
+	ret = shm_init(0);
+	if (!ret) {
 		printf("Intialization of Shared Memory Allocator Failed\n");
 		return;
 	}
