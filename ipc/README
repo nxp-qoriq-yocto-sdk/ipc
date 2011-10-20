@@ -21,9 +21,9 @@ Compilation Procedure
 BootArgs Required
 -----------------
 Please set the bootargs as shown as example:
-default_hugepagesz=16m
-hugepagesz=16m
-hugepages=10
+default_hugepagesz=256m
+hugepagesz=256m
+hugepages=1
 max_num_ipc_channels=64
 max_channel_depth=16
 
@@ -31,8 +31,6 @@ Test Application
 ----------------
 The Test application is run after the DSP image has been loaded by the
 dsp_bt application. To run the test execute the ipc_test application as
-
-$./ipc_test
 
 The Test is run with 6 channels, where for each pair
 of channels linux is producer and DSP is consumer
@@ -64,3 +62,9 @@ The channel pairs are
 	Linux sends a dummy TX request fapi message a set of buffer using DMA.
 	DSP returns to linux a pointer which points to a memory location
 	containing first 16 bytes of fapi message and the first buffer.
+
+For channel 2-3,4-5
+$./ipc_test
+
+For Channel 6-7
+$./ipc_test67

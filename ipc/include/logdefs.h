@@ -32,8 +32,7 @@
 #ifndef LOGDEFS_H
 #define LOGDEFS_H
 #define TEST_CH_ZERO
-#define DBG
-#ifdef DBG
+#ifdef DBGEE
 #define ENTER() printf(">> %s %d %s\n", __FILE__, __LINE__, __func__);
 #define EXIT(A) printf("<< (%d) %s %d %s\n", A, __FILE__, __LINE__, __func__);
 #else
@@ -42,5 +41,11 @@
 #endif
 #define DUMPR(R) printf("P=%x V=%x S=%x \n", (R)->phys_addr, (R)->vaddr,\
 			(R)->size);
+#ifdef DBG
+#define debug_print(...)  printf(__VA_ARGS__);
+#else
+#define debug_print(...)
+#endif
+
 
 #endif

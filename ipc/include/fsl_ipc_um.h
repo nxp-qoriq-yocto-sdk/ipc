@@ -35,6 +35,7 @@
 #define FSL_IPC_UM_H_
 
 #include "fsl_types.h"
+#include "fsl_user_dma.h"
 #include "fsl_psc913x_ipc.h"
 
 #define MAX_CHANNELS 64
@@ -69,6 +70,8 @@ typedef struct {
 	range_t		sh_ctrl_area;
 	range_t		dsp_ccsr;
 	range_t		pa_ccsr;
+
+	fsl_udma_t	udma;
 
 } ipc_userspace_t;
 

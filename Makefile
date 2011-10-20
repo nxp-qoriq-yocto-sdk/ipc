@@ -1,4 +1,4 @@
-PROJECTS = dsp_boot ipc fsl_shm
+PROJECTS = fsl_shm dsp_boot ipc
 
 all:
 	for dir in $(PROJECTS); do \

@@ -41,7 +41,7 @@
 #define MAX_TX_REQ_MSG_SIZE 1020
 #define MAX_SG_ENTRIES 8
 /*****************************************************************************/
-
+typedef void *fsl_ipc_t;
 /*****************************************************************************
  * @ipc_ch_type_t
 *****************************************************************************/
@@ -103,7 +103,8 @@ typedef struct {
  * len		- 	usually contains the length of the context
  *
 *****************************************************************************/
-typedef void (*ipc_cbfunc_t)(uint32_t channel_id, void *context, uint32_t len);
+typedef void (*ipc_cbfunc_t)(uint32_t channel_id, void *context,
+				uint32_t msg_len);
 
 /*****************************************************************************
  * @ipc_p2v_t
@@ -123,15 +124,18 @@ typedef void* (*ipc_p2v_t)(phys_addr_t phys_addr);
  *
  * Init function to initialize the IPC subsystem.
  *
- * phys_addr	-	physical address
+ * p2vcb 	- pointer to a function which does p2v
+ * sh_ctrl_area - range_t for shared control area
+ * dsp_ccsr 	- range_t for dsp_ccsr
+ * pa_ccsr 	- range_t for pa_ccsr
  *
  * Return Value -
- * 	ERR_SUCCESS - no error
- * 	Non zero value - error (check fsl_ipc_errorcodes.h)
+ *			fsl_ipc_t handle.
+ *			This has to be provided in all subsequent calls to ipc
  *
 *****************************************************************************/
-int fsl_ipc_init(ipc_p2v_t p2vcb);
-
+fsl_ipc_t fsl_ipc_init(ipc_p2v_t p2vcb, range_t sh_ctrl_area, range_t dsp_ccsr,
+			range_t pa_ccsr);
 /*****************************************************************************
  * @ipc_configure_channel
  *
@@ -173,9 +177,14 @@ int fsl_ipc_init(ipc_p2v_t p2vcb);
 int fsl_ipc_configure_channel(uint32_t channel_id, uint32_t depth,
 			ipc_ch_type_t channel_type,
 			phys_addr_t msg_ring_paddr, uint32_t msg_size,
-			ipc_cbfunc_t cbfunc);
+			ipc_cbfunc_t cbfunc, fsl_ipc_t ipc);
 
-void fsl_ipc_open_prod_ch(uint32_t channel_id);
+/*****************************************************************************
+ * @fsl_ipc_configure_txreq
+ *
+ ****************************************************************************/
+int fsl_ipc_open_prod_ch(uint32_t channel_id, fsl_ipc_t ipc);
+
 /*****************************************************************************
  * @fsl_ipc_configure_txreq
  *
@@ -194,7 +203,7 @@ void fsl_ipc_open_prod_ch(uint32_t channel_id);
  * 		memory
  ****************************************************************************/
 int fsl_ipc_configure_txreq(uint32_t channel_id, phys_addr_t lbuff_phys_addr,
-			uint32_t max_txreq_linearized_buf_size);
+			uint32_t max_txreq_linearized_buf_size, fsl_ipc_t ipc);
 
 /*****************************************************************************
  *@fsl_ipc_send_ptr
@@ -209,7 +218,7 @@ int fsl_ipc_configure_txreq(uint32_t channel_id, phys_addr_t lbuff_phys_addr,
  * len		- 	length of the producer buffer.
  ****************************************************************************/
 int fsl_ipc_send_ptr(uint32_t channel_id, phys_addr_t buffer_ptr,
-		uint32_t len);
+		uint32_t len, fsl_ipc_t ipc);
 /*****************************************************************************
  *@fsl_ipc_send_msg
  *
@@ -220,7 +229,8 @@ int fsl_ipc_send_ptr(uint32_t channel_id, phys_addr_t buffer_ptr,
  *
  * len		-	length of the producer buffer.
  ****************************************************************************/
-int fsl_ipc_send_msg(uint32_t channel_id, void *src_buf_addr, uint32_t len);
+int fsl_ipc_send_msg(uint32_t channel_id, void *src_buf_addr, uint32_t len,
+			fsl_ipc_t ipc);
 
 /*****************************************************************************
  *@fsl_ipc_send_tx_req
@@ -235,7 +245,7 @@ int fsl_ipc_send_msg(uint32_t channel_id, void *src_buf_addr, uint32_t len);
  * 	Non zero value - error (check fsl_ipc_errorcodes.h)
  ****************************************************************************/
 int fsl_ipc_send_tx_req(uint32_t channel_id, sg_list_t *sgl,
-		void *tx_req_vaddr, uint32_t tx_req_len);
+		void *tx_req_vaddr, uint32_t tx_req_len, fsl_ipc_t ipc);
 
 /*****************************************************************************
  * @fsl_ipc_get_last_tx_req_status
@@ -249,7 +259,7 @@ int fsl_ipc_send_tx_req(uint32_t channel_id, sg_list_t *sgl,
  * 				TXREQ_ERR
  *				(defined in fsl_ipc_errorcodes.h)
  ****************************************************************************/
-int fsl_ipc_get_last_tx_req_status(void);
+int fsl_ipc_get_last_tx_req_status(fsl_ipc_t ipc);
 
 /*****************************************************************************
  * @fsl_ipc_recv_ptr
@@ -267,7 +277,8 @@ int fsl_ipc_get_last_tx_req_status(void);
  * 	ERR_SUCCESS - no error
  * 	Non zero value - error (check fsl_ipc_errorcodes.h)
  ****************************************************************************/
-int fsl_ipc_recv_ptr(uint32_t channel_id, phys_addr_t *addr, uint32_t *len);
+int fsl_ipc_recv_ptr(uint32_t channel_id, phys_addr_t *addr, uint32_t *len,
+			fsl_ipc_t ipc);
 
 /*****************************************************************************
  * @fsl_ipc_recv_ptr_hold
@@ -286,8 +297,8 @@ int fsl_ipc_recv_ptr(uint32_t channel_id, phys_addr_t *addr, uint32_t *len);
  * 	ERR_SUCCESS - no error
  * 	Non zero value - error (check fsl_ipc_errorcodes.h)
  ****************************************************************************/
-int fsl_ipc_recv_ptr_hold(uint32_t channel_id, phys_addr_t *addr, uint32_t *len);
-
+int fsl_ipc_recv_ptr_hold(uint32_t channel_id, phys_addr_t *addr, uint32_t *len,
+			fsl_ipc_t ipc);
 
 /*****************************************************************************
  * @fsl_ipc_recv_msg
@@ -305,7 +316,8 @@ int fsl_ipc_recv_ptr_hold(uint32_t channel_id, phys_addr_t *addr, uint32_t *len)
  * 	ERR_SUCCESS - no error
  * 	Non zero value - error (check fsl_ipc_errorcodes.h)
  ****************************************************************************/
-int fsl_ipc_recv_msg(uint32_t channel_id, void *dst_buffer, uint32_t *len);
+int fsl_ipc_recv_msg(uint32_t channel_id, void *dst_buffer, uint32_t *len,
+		fsl_ipc_t ipc);
 
 /*****************************************************************************
  * @fsl_ipc_recv_msg_ptr
@@ -327,7 +339,8 @@ int fsl_ipc_recv_msg(uint32_t channel_id, void *dst_buffer, uint32_t *len);
  * 	ERR_SUCCESS - no error
  * 	Non zero value - error (check fsl_ipc_errorcodes.h)
  ****************************************************************************/
-int fsl_ipc_recv_msg_ptr(uint32_t channel_id, void *dst_buffer, uint32_t *len);
+int fsl_ipc_recv_msg_ptr(uint32_t channel_id, void *dst_buffer, uint32_t *len,
+			fsl_ipc_t ipc);
 
 /*****************************************************************************
  * @fsl_ipc_set_consumed_status
@@ -337,7 +350,7 @@ int fsl_ipc_recv_msg_ptr(uint32_t channel_id, void *dst_buffer, uint32_t *len);
  * 	Called along with fsl_ipc_recv_msg_ptr to increment the consumer index
  * 	on that channel
  ****************************************************************************/
-void fsl_ipc_set_consumed_status(uint32_t channel_id);
+int fsl_ipc_set_consumed_status(uint32_t channel_id, fsl_ipc_t ipc);
 
 /*****************************************************************************
  * @fsl_ipc_chk_recv_status
@@ -348,8 +361,7 @@ void fsl_ipc_set_consumed_status(uint32_t channel_id);
  * bmask 	- There can be a max of 32 channels. Each bit set represent
  * 		a channel has recieved a message/ptr. Bit 0 MSB - Bit 32 LSB
  * 		(Bit = Channel id)
- * FIXME:	To fix the bmask for 64bit
  ****************************************************************************/
-void fsl_ipc_chk_recv_status(uint32_t *bmask);
+int fsl_ipc_chk_recv_status(uint64_t *bmask, fsl_ipc_t ipc);
 
 #endif /* FSL_913x_IPC_H_ */

@@ -1,5 +1,5 @@
 /*
- * @fsl_user_dma.h
+ * @fsl_usmmgr.h
  *
  * Copyright (c) 2011
  *  Freescale Semiconductor Inc.  All rights reserved.
@@ -29,58 +29,90 @@
  * SUCH DAMAGE.
  *
  *	Author: Manish Jaggi <manish.jaggi@freescale.com>
- *	Author: Pankaj Chauhan <pankaj.chauhan@freescale.com>
  */
-#ifndef _FSL_USER_DMA_H
-#define _FSL_USER_DMA_H
-
-#include <stdint.h>
+#ifndef IPC_HELPER_H
+#define IPC_HELPER_H
 #include "fsl_types.h"
-typedef void *fsl_udma_t;
+#include "fsl_shm.h"
+
+typedef void *fsl_usmmgr_t;
 /*****************************************************************************
- * @fsl_uspace_dma_init
+ * @fsl_usmmgr_init
  *
- * Initialize dma controller.
+ * Initialize the ipc helper memory management subsystem.
+ * Any application which calls this API, will map the complete TLB1 in its
+ * virtual address space
  *
- * dma_list_mem	-	The caller should reserve memory for the dma lib to
- * 			create desriptors. The physical and virtual address
- *			of the reserved memory is provided with dma_list_mem
+ * Return Value:
+ *	ERR_SUCCESS as pass, non zero value as failure
+*****************************************************************************/
+fsl_usmmgr_t fsl_usmmgr_init();
+
+/*****************************************************************************
+ * @fsl_usmmgr_exit
+ *
+ * Deinit the ipc helper memory management subsystem.
  *
 *****************************************************************************/
-fsl_udma_t fsl_uspace_dma_init(range_t dma_list_mem, range_t pa_ccsr);
+int fsl_usmmgr_exit(fsl_usmmgr_t usmmgr);
+
 /*****************************************************************************
- * @fsl_uspace_dma_add_entry
+ * @fsl_usmmgr_p2v
  *
- * Initialize dma controller.
- *
- * src		-	physical address of src buffer
- *
- * dest		-	physical address of destination buffer
- *
- * length	- 	length of the src buffer
+ * Returns the virtual address of a physical address passed as argument.
+ * The p2v mapping suported is for
+ *			- dsp_m2
+ *			- pa_shared_area
+ *			- dsp_shared_area
  *
 *****************************************************************************/
-int fsl_uspace_dma_add_entry(phys_addr_t src, phys_addr_t dest,
-				uint32_t length, fsl_udma_t udma);
+void *fsl_usmmgr_p2v(phys_addr_t, fsl_usmmgr_t usmmgr);
+
 /*****************************************************************************
- * @fsl_uspace_dma_start
+ * @get_pa_shared_area
  *
- * Start the DMA
+ * r	[out] parameter in which the range is returned
  *
+ * Return Value:
+ *	ERR_SUCCESS as pass, non zero value as failure
 *****************************************************************************/
-int fsl_uspace_dma_start(fsl_udma_t udma);
+int get_pa_shared_area(range_t *r, fsl_usmmgr_t usmmgr);
+
 /*****************************************************************************
- * @fsl_uspace_dma_busy
+ * @get_pa_ccsr_area
  *
- * Check if the DMA transfer is in process
+ * Returns the range_t for pa_ccsr area
  *
+ * r	[out] parameter in which the range is returned
+ *
+ * Return Value:
+ *	ERR_SUCCESS as pass, non zero value as failure
 *****************************************************************************/
-int fsl_uspace_dma_busy(fsl_udma_t udma);
+int get_pa_ccsr_area(range_t *r, fsl_usmmgr_t usmmgr);
+
 /*****************************************************************************
- * @fsl_uspace_dma_list_clear
+ * @get_dsp_ccsr_area
  *
- * Clear the DMA descriptor list
+ * Returns the range_t for dsp_ccsr area
  *
+ * r	[out] parameter in which the range is returned
+ *
+ * Return Value:
+ *	ERR_SUCCESS as pass, non zero value as failure
 *****************************************************************************/
-void fsl_uspace_dma_list_clear(fsl_udma_t udma);
+int get_dsp_ccsr_area(range_t *r, fsl_usmmgr_t usmmgr);
+
+/*****************************************************************************
+ * @get_shared_ctrl_area
+ *
+ * Returns the range_t for the shared control area
+ *
+ * r	[out] parameter in which the range is returned
+ *
+ * Return Value:
+ *	ERR_SUCCESS as pass, non zero value as failure
+*****************************************************************************/
+int get_shared_ctrl_area(range_t *r, fsl_usmmgr_t usmmgr);
+
+
 #endif

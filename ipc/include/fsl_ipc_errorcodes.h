@@ -59,4 +59,6 @@
 #define ERR_DMA_BUSY				21
 #define	ERR_DEV_HW_SEM_FAIL			22
 #define ERR_FAIL				23
+#define ERR_NULL_VALUE				24
+#define ERR_PRODUCER_NOT_INIT			25
 #endif /* FSL_PSC913X_IPC_ERRORCODES_H_ */
