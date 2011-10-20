@@ -88,16 +88,13 @@ void channel67_thread(void *ptr)
 	}
 	ch7init = 1;
 
-	vaddr = (void *)shm_alloc(0x100000);
-	if (!vaddr) {
+	r.size = 0x100000;
+	ret = fsl_usmmgr_alloc(&r, usmmgr);
+	if (ret) {
 		printf("\n Unable to allocate memory from shm_alloc \n");
 		EXIT(-1);
 		pthread_exit(0);
 	}
-
-	r.vaddr = vaddr;
-	r.phys_addr = (phys_addr_t) shm_vtop(r.vaddr);
-	r.size = 0x100000;
 
 	printf("range of free pool P=%x V=%x S=%x\n", r.phys_addr, r.vaddr,
 	       r.size);

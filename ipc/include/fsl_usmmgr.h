@@ -37,6 +37,53 @@
 
 typedef void *fsl_usmmgr_t;
 /*****************************************************************************
+ * @fsl_usmmgr_alloc
+ *
+ * Perform Memory allocation from shared area.
+ *
+ * r:
+ *    size[in]- Memory size that needs to be allocated.
+ *    vaddr[out] - virtual address of allocated memory.
+ *    phys_addr[out] - physical address of allocated memory.
+ *
+ * usmmgr - handle returned by fsl_usmmgr_init.
+ *
+ * Return: On Sucess, zero is returned
+ *          On Failure, less than zero is returned.
+*****************************************************************************/
+int fsl_usmmgr_alloc(range_t *r, fsl_usmmgr_t usmmgr);
+
+/*****************************************************************************
+ * @fsl_usmmgr_memalign
+ *
+ * Perform Aligned Memory Allocation from pa_shared_area
+ *
+ * r:
+ *    size[in] - Memory size that needs to be allocated.
+ *    vaddr[out] - virtual address of allocated memory.
+ *    phys_addr[out] - physical address of allocated memory.
+ *
+ * usmmgr - handle returned by fsl_usmmgr_init.
+ *
+ * Return: On Sucess, zero is returned
+ *          On Failure, less than zero is returned.
+*****************************************************************************/
+int fsl_usmmgr_memalign(range_t *r, unsigned long align, fsl_usmmgr_t usmmgr);
+
+/*****************************************************************************
+ * @fsl_usmmgr_free
+ *
+ * Frees the memory allocated using fsl_usmmgr_alloc, fsl_usmmgr_memalign.
+ *
+ * r:
+ *    vaddr[in] - virtual address of allocated memory.
+ *
+ * usmmgr - handle returned by fsl_usmmgr_init.
+ *
+*****************************************************************************/
+void fsl_usmmgr_free(range_t *r, fsl_usmmgr_t usmmgr);
+
+/*****************************************************************************
  * @fsl_usmmgr_init
  *
  * Initialize the ipc helper memory management subsystem.
@@ -53,6 +100,8 @@ fsl_usmmgr_t fsl_usmmgr_init();
  *
  * Deinit the ipc helper memory management subsystem.
  *
+ * usmmgr - handle returned by fsl_usmmgr_init.
+ *
 *****************************************************************************/
 int fsl_usmmgr_exit(fsl_usmmgr_t usmmgr);
 
@@ -65,6 +114,8 @@ int fsl_usmmgr_exit(fsl_usmmgr_t usmmgr);
  *			- pa_shared_area
  *			- dsp_shared_area
  *
+ * usmmgr - handle returned by fsl_usmmgr_init.
+ *
 *****************************************************************************/
 void *fsl_usmmgr_p2v(phys_addr_t, fsl_usmmgr_t usmmgr);
 
@@ -72,6 +123,8 @@ void *fsl_usmmgr_p2v(phys_addr_t, fsl_usmmgr_t usmmgr);
  * @get_pa_shared_area
  *
  * r	[out] parameter in which the range is returned
+ *
+ * usmmgr - handle returned by fsl_usmmgr_init.
  *
  * Return Value:
  *	ERR_SUCCESS as pass, non zero value as failure
@@ -85,6 +138,8 @@ int get_pa_shared_area(range_t *r, fsl_usmmgr_t usmmgr);
  *
  * r	[out] parameter in which the range is returned
  *
+ * usmmgr - handle returned by fsl_usmmgr_init.
+ *
  * Return Value:
  *	ERR_SUCCESS as pass, non zero value as failure
 *****************************************************************************/
@@ -97,6 +152,8 @@ int get_pa_ccsr_area(range_t *r, fsl_usmmgr_t usmmgr);
  *
  * r	[out] parameter in which the range is returned
  *
+ * usmmgr - handle returned by fsl_usmmgr_init.
+ *
  * Return Value:
  *	ERR_SUCCESS as pass, non zero value as failure
 *****************************************************************************/
@@ -108,6 +165,8 @@ int get_dsp_ccsr_area(range_t *r, fsl_usmmgr_t usmmgr);
  * Returns the range_t for the shared control area
  *
  * r	[out] parameter in which the range is returned
+ *
+ * usmmgr - handle returned by fsl_usmmgr_init.
  *
  * Return Value:
  *	ERR_SUCCESS as pass, non zero value as failure

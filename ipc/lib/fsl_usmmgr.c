@@ -78,6 +78,40 @@ typedef struct {
 
 void cleanup(usmmgr_priv *priv);
 /* */
+
+int fsl_usmmgr_alloc(range_t *r, fsl_usmmgr_t usmmgr)
+{
+	if (!r->size)
+		return -1;
+
+	r->vaddr = shm_alloc(r->size);
+	if (!r->vaddr)
+		return -1;
+
+	r->phys_addr = (phys_addr_t)shm_vtop(r->vaddr);
+
+	return 0;
+}
+
+int fsl_usmmgr_memalign(range_t *r, unsigned long align, fsl_usmmgr_t usmmgr)
+{
+	if (!r->size)
+		return -1;
+
+	r->vaddr = shm_memalign(r->size, align);
+	if (!r->vaddr)
+		return -1;
+
+	r->phys_addr = (phys_addr_t)shm_vtop(r->vaddr);
+
+	return 0;
+}
+
+void fsl_usmmgr_free(range_t *r, fsl_usmmgr_t usmmgr)
+{
+	shm_free(r->vaddr);
+}
+
 fsl_usmmgr_t fsl_usmmgr_init(void)
 {
 	int ret;
