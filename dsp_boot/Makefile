@@ -1,7 +1,8 @@
 CC=$(CROSS_COMPILE)gcc
 HET_DIR=$(KERNEL_DIR)/drivers/misc
-SOURCES= ./dsp_boot.c
-CFLAGS= -I $(HET_DIR)
+FSL_SHM_DIR=../fsl_shm/include
+SOURCES= ./dsp_boot.c ../fsl_shm/lib/lg_shm.c
+CFLAGS= -I $(HET_DIR) -I $(FSL_SHM_DIR)
 
 dsp_bt:
 	$(CC) $(CFLAGS) $(SOURCES)  -o $@
