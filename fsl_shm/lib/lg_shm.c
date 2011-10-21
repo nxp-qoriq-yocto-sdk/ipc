@@ -148,7 +148,7 @@ void *shm_init(size_t dsp_shared_size)
 
 	shmid = shmget(LG_SHM_KEY, HUGE_PAGE_256M,
 		       SHM_HUGETLB | IPC_CREAT | SHM_R | SHM_W);
-	if (shmid) {
+	if (shmid < 0) {
 		perror("shmget");
 		close(fd);
 		return NULL;
