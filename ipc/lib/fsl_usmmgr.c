@@ -329,6 +329,15 @@ int get_pa_ccsr_area(range_t *r, fsl_usmmgr_t usmmgr)
 	return ret;
 }
 
+phys_addr_t fsl_usmmgr_v2p(void *vaddr, fsl_usmmgr_t usmmgr)
+{
+	phys_addr_t paddr;
+
+	paddr = (phys_addr_t)shm_vtop(vaddr);
+
+	return paddr;
+}
+
 void *fsl_usmmgr_p2v(phys_addr_t phys_addr, fsl_usmmgr_t usmmgr)
 {
 	int i, j;

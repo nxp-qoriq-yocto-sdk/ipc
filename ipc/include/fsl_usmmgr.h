@@ -120,6 +120,20 @@ int fsl_usmmgr_exit(fsl_usmmgr_t usmmgr);
 void *fsl_usmmgr_p2v(phys_addr_t, fsl_usmmgr_t usmmgr);
 
 /*****************************************************************************
+ * @fsl_usmmgr_v2p
+ *
+ * Perform virtual to physical address translation.
+ *
+ * vaddr[in] - virtual address to be traslated
+ * usmmgr[in] - handle returned by fsl_usmmgr_init.
+ *
+ * Return: On Sucess, physical address is returned
+ *         On Failure, zero value is returned.
+ *
+******************************************************************************/
+phys_addr_t fsl_usmmgr_v2p(void *vaddr, fsl_usmmgr_t usmmgr);
+
+/*****************************************************************************
  * @get_pa_shared_area
  *
  * r	[out] parameter in which the range is returned
