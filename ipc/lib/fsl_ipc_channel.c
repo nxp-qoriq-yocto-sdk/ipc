@@ -242,13 +242,15 @@ int fsl_ipc_configure_txreq(uint32_t channel_id, phys_addr_t phys_addr,
 	/* Get spare area vaddr */
 /*FIXME: Currently extra memory is taken for saving dma descriptors*/
 	phys_addr_s = ipc_priv->txreq_tb_lbuff_paddr +
-		(ipc_ch->bd_ring_size + 2) * ipc_priv->max_txreq_lbuff_size;
+		(ipc_ch->bd_ring_size) * ipc_priv->max_txreq_lbuff_size;
 
 	debug_print("Phys_addr_s =%x\n", phys_addr_s);
 
-	phys_addr_s += 2*sizeof(phys_addr_t);
+	/*Making room for some extra variables, and making it aligned*/
+	phys_addr_s += 32*sizeof(phys_addr_t);
 
-	phys_addr_s += (32  - phys_addr_s % 32);
+	if (phys_addr_s % 32)
+		phys_addr_s += (32  - phys_addr_s % 32);
 
 	dma_list_mem.phys_addr = phys_addr_s;
 
@@ -304,21 +306,22 @@ int fsl_ipc_send_tx_req(uint32_t channel_id, sg_list_t *sgl,
 		EXIT(-1);
 		return -1;
 	}
+
 	debug_print("copying %x to %x length %x\n",
 		vaddr, tx_req_vaddr, tx_req_len);
 	memcpy(vaddr, tx_req_vaddr, tx_req_len);
 
-	/*write the lbuff address at the end of the message */
-	debug_print("copying %x to %x length %x\n", ((uint32_t)vaddr +
-		MAX_TX_REQ_MSG_SIZE), ipc_priv->txreq_tb_lbuff_paddr,
-			sizeof(phys_addr_t));
-	memcpy((void *)((uint32_t)vaddr + MAX_TX_REQ_MSG_SIZE),
-		&ipc_priv->txreq_tb_lbuff_paddr, sizeof(phys_addr_t));
-
-/*OLD	phys_addr = ipc_priv->txreq_tb_lbuff_paddr +
-ipc_ch->tracker.producer_num*ipc_priv->max_txreq_lbuff_size;*/
+	/*OLD	phys_addr = ipc_priv->txreq_tb_lbuff_paddr +
+	ipc_ch->tracker.producer_num*ipc_priv->max_txreq_lbuff_size;*/
 	phys_addr = ipc_priv->txreq_tb_lbuff_paddr +
 		ipc_ch->LOCAL_PRODUCER_NUM * ipc_priv->max_txreq_lbuff_size;
+
+	/*write the lbuff address at the end of the message */
+	debug_print("copying %x to %x length %x\n", ((uint32_t)vaddr +
+		MAX_TX_REQ_MSG_SIZE), phys_addr,
+			sizeof(phys_addr_t));
+	memcpy((void *)((uint32_t)vaddr + MAX_TX_REQ_MSG_SIZE),
+		&phys_addr, sizeof(phys_addr_t));
 
 	ctr = 0;
 	while (sgl->entry[ctr].is_valid) {
@@ -335,7 +338,7 @@ ipc_ch->tracker.producer_num*ipc_priv->max_txreq_lbuff_size;*/
 	}
 	/* Get spare area vaddr */
 	phys_addr = ipc_priv->txreq_tb_lbuff_paddr +
-			(ipc_ch->bd_ring_size + 2) *
+			(ipc_ch->bd_ring_size) *
 			ipc_priv->max_txreq_lbuff_size;
 
 	vaddr = (*ipc_priv->p2vcb)(phys_addr);
