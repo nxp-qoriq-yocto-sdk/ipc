@@ -71,7 +71,7 @@ void channel67_thread(void *ptr)
 	phys_addr_t p;
 	uint32_t len;
 	int ret;
-	int depth = 8;
+	int depth = 16;
 	int ctr;
 	range_t r;
 	sg_entry_t *e;
@@ -88,7 +88,7 @@ void channel67_thread(void *ptr)
 	}
 	ch7init = 1;
 
-	r.size = 0x100000;
+	r.size = 0x200000;
 	ret = fsl_usmmgr_alloc(&r, usmmgr);
 	if (ret) {
 		printf("\n Unable to allocate memory from shm_alloc \n");
@@ -98,7 +98,7 @@ void channel67_thread(void *ptr)
 
 	printf("range of free pool P=%x V=%x S=%x\n", r.phys_addr, r.vaddr,
 	       r.size);
-	ret = fsl_ipc_configure_txreq(6, r.phys_addr + 0x100000, 1024, ipc);
+	ret = fsl_ipc_configure_txreq(6, r.phys_addr + 0x100000, 1024*2, ipc);
 	if (ret) {
 		printf("\n Error in fsl_ipc_configure_txreq ret %d \n", ret);
 		goto end;
@@ -130,7 +130,7 @@ void channel67_thread(void *ptr)
 			ret =
 			    fsl_ipc_send_tx_req(6, &lst, &fapi_msg, 1020, ipc);
 			first = 0;
-		} while (ret == ERR_CHANNEL_FULL);
+		} while (ret == -ERR_CHANNEL_FULL);
 		if (ret) {
 			printf("\n ERROR ret %x \n", ret);
 			goto end;
