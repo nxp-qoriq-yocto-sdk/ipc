@@ -24,14 +24,14 @@
  *	Author: Naveen Burmi <naveenburmi@freescale.com>
  */
 
-#ifndef __FSL_SHM_H
-#define __FSL_SHM_H
+#ifndef __FSL_IPC_SHM_H
+#define __FSL_IPC_SHM_H
 
 void *shm_vtop(void *ptr);
 void *shm_ptov(void *ptr);
 void *shm_alloc(size_t size);
 void *shm_memalign(size_t size, unsigned long align);
 void shm_free(void *ptr);
-void *shm_init(size_t dsp_shared_size);
+void *fsl_shm_init(size_t dsp_shared_size);
 
 #endif

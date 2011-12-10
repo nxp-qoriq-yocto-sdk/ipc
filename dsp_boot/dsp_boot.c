@@ -404,7 +404,7 @@ static inline int init_hugetlb(void)
 {
 	int ret;
 	void *pa_p, *dsp_v;
-	pa_p = (void *)shm_init(het_sys_map.dsp_shared_size);
+	pa_p = (void *)fsl_shm_init(het_sys_map.dsp_shared_size);
 	if (!pa_p) {
 		ret = -1;
 		goto end;

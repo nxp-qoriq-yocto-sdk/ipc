@@ -33,7 +33,7 @@
 #ifndef IPC_HELPER_H
 #define IPC_HELPER_H
 #include "fsl_types.h"
-#include "fsl_shm.h"
+#include "fsl_ipc_shm.h"
 
 typedef void *fsl_usmmgr_t;
 /*****************************************************************************

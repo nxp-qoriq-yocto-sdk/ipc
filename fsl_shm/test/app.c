@@ -29,8 +29,8 @@
 #include <sys/shm.h>
 #include<linux/fs.h>
 
-/* For using Share Memory Allocator, Application MUST include fsl_shm.h */
-#include "fsl_shm.h"
+/* For using Share Memory Allocator, Application MUST include fsl_ipc_shm.h */
+#include "fsl_ipc_shm.h"
 
 main(int argc, char *argv[], char *envp[])
 {
@@ -40,12 +40,12 @@ main(int argc, char *argv[], char *envp[])
 
 	/*
 	 * Before using any allocation(shm_alloc), de-allocation(shm_free) API
-	 * application MUST call shm_init API.
+	 * application MUST call fsl_shm_init API.
 	 *
-	 * shm_init needs to be called, ONLY ONCE, during the initialization
+	 * fsl_shm_init needs to be called, ONLY ONCE, during the initialization
 	 * of application.
 	 */
-	ret = shm_init(0);
+	ret = fsl_shm_init(0);
 	if (!ret) {
 		printf("Intialization of Shared Memory Allocator Failed\n");
 		return;
