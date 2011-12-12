@@ -1,7 +1,7 @@
 CC=$(CROSS_COMPILE)gcc
 AR=$(CROSS_COMPILE)ar
 HET_DIR=$(KERNEL_DIR)/drivers/misc
-CFLAGS=-lpthread -I ./include -I../fsl_shm/include -I $(HET_DIR)
+CFLAGS=-lpthread -I ./include -I../fsl_shm/include -I $(HET_DIR) -Wall
 
 all: mem_lib ipc_lib ipc_test
 ipc_lib:

@@ -1,6 +1,6 @@
 CC=$(CROSS_COMPILE)gcc
 AR=$(CROSS_COMPILE)ar
-CFLAGS=-I ./lib -I ./include
+CFLAGS=-I ./lib -I ./include -Wall
 
 all: lg_shm_lib lg_shm_test
 lg_shm_lib:
