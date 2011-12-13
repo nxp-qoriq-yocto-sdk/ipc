@@ -149,13 +149,14 @@ fsl_ipc_t fsl_ipc_init(ipc_p2v_t p2vcb, range_t sh_ctrl_area, range_t dsp_ccsr,
  * depth 	- 	user configurable number of entries in the ring.
  * 			depth <= max depth
  *
- * channel_type -	either of IPC_PTR_CH/IPC_MSG_CH only
+ * channel_type -	either of IPC_PTR_CH/IPC_MSG_CH
  *
- * msg_ring_paddr - 	Physical address of the message ring.
+ * msg_ring_paddr - 	Physical address of the message ring. Required
+ *			only for IPC_MSG_CH
  *
  * msg_size 	- 	max size of each message.
  * 			For PTR_CH, msg_ring_vaddr, msg_ring_paddr, msg_size
- *	 		are all NULL.
+ *	 		are all NULL. Required only for IPC_MSG_CH
  *
  * cbfunc	- 	The callback function called on receiving a interrupt
  * 			from the producer. If cbfunc is NULL, channel does not
@@ -180,8 +181,12 @@ int fsl_ipc_configure_channel(uint32_t channel_id, uint32_t depth,
 			ipc_cbfunc_t cbfunc, fsl_ipc_t ipc);
 
 /*****************************************************************************
- * @fsl_ipc_configure_txreq
+ * @fsl_ipc_open_prod_ch
  *
+ * Sets the Producer Initialized value in the channel structure
+ * Return Value:
+ * 	ERR_SUCCESS - no error
+ * 	Non zero value - error (check fsl_ipc_errorcodes.h)
  ****************************************************************************/
 int fsl_ipc_open_prod_ch(uint32_t channel_id, fsl_ipc_t ipc);
 
@@ -189,18 +194,28 @@ int fsl_ipc_open_prod_ch(uint32_t channel_id, fsl_ipc_t ipc);
  * @fsl_ipc_configure_txreq
  *
  * For tx request the DSP side creates a msg channel of a particular depth
- * having each entry the size of tx_request fapi message, the producer side
- * IPC allocates a set of buffers for linearizing the tx request PDU's.
+ * having each entry the size of tx_request fapi message. The size of a
+ * tx_request message in IPC is 1024bytes at max. The fapi message
+ * can be of max 1020 bytes. Last 4 bytes points to the linearized buffer
+ * corresponsing to the tx_request fapi message.
+ * While DSP allocates memory for tx_request FAPI message, the producer
+ * PA allocates memory for lineraized buffers.
+ * PA allocate memory = (Max size of 1 lineaized buffer)*(channel depth +2)
  *
- * The number of such buffers is same as depth of the channel + 1
  * NOTE: The extra buffer is used as a spare for IPC internal operations
  *
  * channel_id - unique id of the channel
  *
  * max_txreq_linearized_buf_size -
  * 		max size of a buffer which holds the linearized TB.
- * 		IPC reads the depth and allocates depth*max_txreq_lbuff_size
- * 		memory
+ * 		PA allocates (depth+2)*max_txreq_lbuff_size
+ *
+ * lbuff_phys_addr -
+ *		Start address of the allocated buffer
+ *
+ * Note: PA should not use this buffer for other operation.
+ * Return Value -
+ * 	ERR_SUCCESS - no error
  ****************************************************************************/
 int fsl_ipc_configure_txreq(uint32_t channel_id, phys_addr_t lbuff_phys_addr,
 			uint32_t max_txreq_linearized_buf_size, fsl_ipc_t ipc);
@@ -216,6 +231,9 @@ int fsl_ipc_configure_txreq(uint32_t channel_id, phys_addr_t lbuff_phys_addr,
  * 		    	producer and consumer
  *
  * len		- 	length of the producer buffer.
+ * Return Value -
+ * 	ERR_SUCCESS - no error
+ * 	Non zero value - error (check fsl_ipc_errorcodes.h)
  ****************************************************************************/
 int fsl_ipc_send_ptr(uint32_t channel_id, phys_addr_t buffer_ptr,
 		uint32_t len, fsl_ipc_t ipc);
@@ -228,6 +246,8 @@ int fsl_ipc_send_ptr(uint32_t channel_id, phys_addr_t buffer_ptr,
  * src_buf_addr	-	virtual address of the producer buffer
  *
  * len		-	length of the producer buffer.
+ * Return Value -
+ * 	ERR_SUCCESS - no error
  ****************************************************************************/
 int fsl_ipc_send_msg(uint32_t channel_id, void *src_buf_addr, uint32_t len,
 			fsl_ipc_t ipc);
@@ -349,18 +369,24 @@ int fsl_ipc_recv_msg_ptr(uint32_t channel_id, void *dst_buffer, uint32_t *len,
  *
  * 	Called along with fsl_ipc_recv_msg_ptr to increment the consumer index
  * 	on that channel
+ * Return Value -
+ * 	ERR_SUCCESS - no error
+ * 	Non zero value - error (check fsl_ipc_errorcodes.h)
  ****************************************************************************/
 int fsl_ipc_set_consumed_status(uint32_t channel_id, fsl_ipc_t ipc);
 
 /*****************************************************************************
  * @fsl_ipc_chk_recv_status
  *
- * The api checks all the consumer channels owned by the calling process to
+ * The api checks all the consumer channels owned by the _calling process_ to
  * find out which has a msg/ptr received.
  *
  * bmask 	- There can be a max of 32 channels. Each bit set represent
- * 		a channel has recieved a message/ptr. Bit 0 MSB - Bit 32 LSB
+ * 		a channel has recieved a message/ptr. Bit 0 MSB - Bit 64 LSB
  * 		(Bit = Channel id)
+ * Return Value -
+ * 	ERR_SUCCESS - no error
+ * 	Non zero value - error (check fsl_ipc_errorcodes.h)
  ****************************************************************************/
 int fsl_ipc_chk_recv_status(uint64_t *bmask, fsl_ipc_t ipc);
 
