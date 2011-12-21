@@ -32,6 +32,7 @@
 /* For using Share Memory Allocator, Application MUST include fsl_ipc_shm.h */
 #include "fsl_ipc_shm.h"
 
+int
 main(int argc, char *argv[], char *envp[])
 {
 	void *ret;
@@ -48,7 +49,7 @@ main(int argc, char *argv[], char *envp[])
 	ret = fsl_shm_init(0);
 	if (!ret) {
 		printf("Intialization of Shared Memory Allocator Failed\n");
-		return;
+		return -1;
 	}
 
 	/*
@@ -59,7 +60,7 @@ main(int argc, char *argv[], char *envp[])
 	ptr = (unsigned int *)shm_alloc(0x100000);
 	if (!ptr) {
 		printf("Memory Allocation Failed through shm_alloc\n");
-		return;
+		return -1;
 	}
 
 	*ptr = 0xdeadbeaf;
@@ -76,7 +77,7 @@ main(int argc, char *argv[], char *envp[])
 	 */
 	vaddr = shm_ptov(paddr);
 
-	printf("shm_alloc: vaddr %#x paddr %#x\n", vaddr, paddr);
+	printf("shm_alloc: vaddr %p paddr %p\n", vaddr, paddr);
 
 	/*
 	 * shm_memalign - Used for allocation of aligned shared memory area.
@@ -86,10 +87,10 @@ main(int argc, char *argv[], char *envp[])
 	ptr1 = (unsigned int *)shm_memalign(0x100000, 0x1000000);
 	if (!ptr1) {
 		printf("Aligned Memory Allocation Failed using shm_memalign\n");
-		return;
+		return -1;
 	}
 
-	printf("shm_memalign: vaddr %#x paddr %#x\n", ptr1, shm_vtop(ptr1));
+	printf("shm_memalign: vaddr %p paddr %p\n", ptr1, shm_vtop(ptr1));
 
 	/*
 	 * shm_free - It free/de-allocates the memory allocated using shm_alloc
@@ -99,4 +100,6 @@ main(int argc, char *argv[], char *envp[])
 	shm_free(ptr1);
 
 	printf("Apps finished\n");
+
+	return 0;
 }

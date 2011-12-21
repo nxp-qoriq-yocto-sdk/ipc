@@ -200,7 +200,6 @@ int map_shared_mem(usmmgr_priv *priv)
 {
 	int ret = ERR_SUCCESS;
 	void *vaddr;
-	range_t r;
 
 	ENTER();
 	/* open /dev/mem
@@ -340,7 +339,7 @@ phys_addr_t fsl_usmmgr_v2p(void *vaddr, fsl_usmmgr_t usmmgr)
 
 void *fsl_usmmgr_p2v(phys_addr_t phys_addr, fsl_usmmgr_t usmmgr)
 {
-	int i, j;
+	int i;
 	void *vaddr = NULL;
 	ENTER();
 	debug_print("%x \n", phys_addr);

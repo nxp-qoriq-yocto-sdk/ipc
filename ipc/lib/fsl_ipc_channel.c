@@ -76,7 +76,6 @@ fsl_ipc_t fsl_ipc_init(ipc_p2v_t p2vcb, range_t sh_ctrl_area,
 		range_t dsp_ccsr, range_t pa_ccsr)
 {
 	int ret = ERR_SUCCESS;
-	ipc_bootargs_info_t ba;
 	struct sigaction sig_action;
 	ipc_userspace_t *ipc_priv = NULL;
 
@@ -112,8 +111,11 @@ fsl_ipc_t fsl_ipc_init(ipc_p2v_t p2vcb, range_t sh_ctrl_area,
 end:
 	EXIT(ret);
 	if (ret) /* if ret non zero free ipc_priv */
-		if (ipc_priv)
+		if (ipc_priv) {
 			free(ipc_priv);
+			ipc_priv = NULL;
+		}
+
 	return ipc_priv;
 }
 
@@ -270,7 +272,6 @@ int fsl_ipc_send_tx_req(uint32_t channel_id, sg_list_t *sgl,
 	uint32_t			ctr;
 	uint32_t			incr1, incr2;
 	void				*vaddr;
-	sg_entry_t			*sge;
 	phys_addr_t			phys_addr;
 	phys_addr_t			phys_addr2;
 	os_het_ipc_bd_t			*bd_base;
@@ -874,7 +875,6 @@ end:
  */
 phys_addr_t get_channel_paddr(uint32_t channel_id, ipc_userspace_t *ipc_priv)
 {
-	os_het_ipc_channel_t 	*ch;
 	phys_addr_t		phys_addr;
 
 	ENTER();

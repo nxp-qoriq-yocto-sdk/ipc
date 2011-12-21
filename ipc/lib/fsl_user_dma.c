@@ -114,9 +114,7 @@ typedef struct {
 
 fsl_udma_t fsl_uspace_dma_init(range_t dma_list_mem, range_t pa_ccsr)
 {
-	int i;
 	void *dma;
-	int ret = ERR_SUCCESS;
 	ENTER();
 
 	uspace_dma_t *dma_priv = malloc(sizeof(uspace_dma_t));
@@ -137,7 +135,7 @@ fsl_udma_t fsl_uspace_dma_init(range_t dma_list_mem, range_t pa_ccsr)
 	debug_print("Setting dma_priv->dma->clndar = %x\n",
 		    dma_priv->dma_list_mem.phys_addr);
 end:
-	EXIT(ret);
+	EXIT(0);
 	return dma_priv;
 }
 

@@ -137,8 +137,6 @@ void shm_free(void *ptr)
 void *fsl_shm_init(size_t dsp_shared_size)
 {
 	int shmid;
-	unsigned long i;
-	char *shmaddr;
 
 	fd = open(DEV_FILE, O_RDONLY);
 	if (fd < 0) {

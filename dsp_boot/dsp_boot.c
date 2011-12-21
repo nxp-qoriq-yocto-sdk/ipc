@@ -116,15 +116,15 @@ void cleanup();
 void dump_sys_map()
 {
 	printf("SYSTEM MAP\n");
-	printf("DSP PrivArea: Addr=%x Size=%x\n",
+	printf("DSP PrivArea: Addr=%lx Size=%x\n",
 		het_sys_map.smart_dsp_os_priv_area.phys_addr,
 		het_sys_map.smart_dsp_os_priv_area.size);
 
-	printf("Shared CtrlArea: Addr=%x Size=%x\n",
+	printf("Shared CtrlArea: Addr=%lx Size=%x\n",
 		het_sys_map.sh_ctrl_area.phys_addr,
 		het_sys_map.sh_ctrl_area.size);
 
-	printf("DSP Core0 M2: Addr=%x Size=%x\n",
+	printf("DSP Core0 M2: Addr=%lx Size=%x\n",
 		het_sys_map.dsp_core0_m2.phys_addr,
 		het_sys_map.dsp_core0_m2.size);
 #ifdef PSC9132
@@ -136,11 +136,11 @@ void dump_sys_map()
 		het_sys_map.dsp_m3.phys_addr,
 		het_sys_map.dsp_m3.size);
 #endif
-	printf("PA CCSRBAR: Addr =%x Size=%x\n",
+	printf("PA CCSRBAR: Addr =%lx Size=%x\n",
 		het_sys_map.pa_ccsrbar.phys_addr,
 		het_sys_map.pa_ccsrbar.size);
 
-	printf("DSP CCSRBAR: Addr =%x Size=%x\n",
+	printf("DSP CCSRBAR: Addr =%lx Size=%x\n",
 		het_sys_map.dsp_ccsrbar.phys_addr,
 		het_sys_map.dsp_ccsrbar.size);
 }
@@ -360,6 +360,13 @@ int load_dsp_image(char *fname)
 			break;
 
 		vaddr = p2v(addr);
+		if (!vaddr) {
+			ret = -1;
+			printf("\n Error in translating physical address %#x"
+			       " to virtual address\n", addr);
+			goto end_close_file;
+		}
+
 		ret = copy_file_part(vaddr, size, dspbin);
 		if (ret)
 			goto end_close_file;
@@ -378,6 +385,12 @@ static inline int dsp_ready_set()
 	uint32_t val;
 	ret = 0;
 	vaddr = p2v(het_sys_map.pa_ccsrbar.phys_addr + DSPSR);
+	if (!vaddr) {
+		printf("\nError in translating physical address %lx to virtual"
+		       "address\n", het_sys_map.pa_ccsrbar.phys_addr + DSPSR);
+		return -1;
+	}
+
 	val = *vaddr;
 	if (val & DSPSR_DSP1_READY) {
 		printf("DSP READY SET\n");
@@ -397,13 +410,20 @@ static inline void set_ppc_ready()
 
 	/* write to ppc ready */
 	vaddr = p2v(het_sys_map.dsp_ccsrbar.phys_addr + DSP_GCR + PASTATE);
+	if (!vaddr) {
+		printf("\nError in translating physical address %lx to virtual"
+		       "address\n",
+		       het_sys_map.dsp_ccsrbar.phys_addr + DSP_GCR + PASTATE);
+		return;
+	}
+
 	*vaddr |= PASTATE_PAREADY;
 }
 
 static inline int init_hugetlb(void)
 {
 	int ret;
-	void *pa_p, *dsp_v;
+	void *pa_p;
 	pa_p = (void *)fsl_shm_init(het_sys_map.dsp_shared_size);
 	if (!pa_p) {
 		ret = -1;
@@ -418,11 +438,11 @@ static inline int init_hugetlb(void)
 					- het_sys_map.dsp_shared_size;
 	shared_area.dsp_ipc_shared.size = het_sys_map.dsp_shared_size;
 
-	printf("PA Shared Area: Addr=%x Size=%x\n",
+	printf("PA Shared Area: Addr=%lx Size=%x\n",
 		shared_area.pa_ipc_shared.phys_addr,
 		shared_area.pa_ipc_shared.size);
 
-	printf("DSP Shared Area: Addr=%x Size=%x\n",
+	printf("DSP Shared Area: Addr=%lx Size=%x\n",
 		shared_area.dsp_ipc_shared.phys_addr,
 		shared_area.dsp_ipc_shared.size);
 

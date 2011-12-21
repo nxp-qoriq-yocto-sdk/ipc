@@ -54,27 +54,29 @@ void dump_msg(char *msg, int len)
 	printf("\n");
 }
 
-void main()
+int main()
 {
 	test_init();
+
+	return 0;
 }
 
 int isbitset(uint64_t v, int bit)
 {
 	if ((v >> (63 - bit)) & 0x1)
 		return 1;
+
+	return 0;
 }
 
 void channel67_thread(void *ptr)
 {
-	uint64_t bmask;
 	phys_addr_t p;
 	uint32_t len;
 	int ret;
 	int depth = 16;
 	int ctr;
 	range_t r;
-	sg_entry_t *e;
 	sg_list_t lst;
 	void *vaddr;
 	int first = 1;
@@ -96,7 +98,7 @@ void channel67_thread(void *ptr)
 		pthread_exit(0);
 	}
 
-	printf("range of free pool P=%x V=%x S=%x\n", r.phys_addr, r.vaddr,
+	printf("range of free pool P=%lx V=%p S=%x\n", r.phys_addr, r.vaddr,
 	       r.size);
 	ret = fsl_ipc_configure_txreq(6, r.phys_addr + 0x100000, 1024*2, ipc);
 	if (ret) {
@@ -110,16 +112,30 @@ void channel67_thread(void *ptr)
 		lst.entry[0].len = 1024;
 		lst.entry[0].is_valid = 1;
 		vaddr = fsl_usmmgr_p2v(lst.entry[0].src_addr, usmmgr);
+		if (!vaddr) {
+			ret = -ERR_NULL_VALUE;
+			printf("\nError in translating physical address %lx "
+			       "to virtual address\n", lst.entry[0].src_addr);
+			goto end;
+		}
+
 		memset(vaddr, 0x11 + ctr, 1024);
 
 		lst.entry[1].src_addr = r.phys_addr + 1024 * 16;
 		lst.entry[1].len = 1024;
 		lst.entry[1].is_valid = 1;
 		vaddr = fsl_usmmgr_p2v(lst.entry[1].src_addr, usmmgr);
+		if (!vaddr) {
+			ret = -ERR_NULL_VALUE;
+			printf("\nError in translating physical address %lx "
+			       "to virtual address\n", lst.entry[1].src_addr);
+			goto end;
+		}
+
 		memset(vaddr, 0x22 + ctr, 1024);
 
 		lst.entry[2].is_valid = 0;
-		vaddr = fsl_usmmgr_p2v(lst.entry[1].src_addr, usmmgr);
+		/* vaddr = fsl_usmmgr_p2v(lst.entry[1].src_addr, usmmgr); */
 		memset(fapi_msg, ctr, 1020);
 		do {
 			if (!first)
@@ -145,7 +161,7 @@ void channel67_thread(void *ptr)
 			printf("\n ERROR ret %x \n", ret);
 			goto end;
 		}
-		printf("\nR:C7:P:[%x]L:%x\n", p, len);
+		printf("\nR:C7:P:[%lx]L:%x\n", p, len);
 		ctr++;
 	}
 end:
@@ -161,13 +177,9 @@ void *test_p2v(phys_addr_t phys_addr)
 
 void test_init()
 {
-	range_t r;
-	uint64_t bmask;
 	int ret = 0;
-	int ret1, ret2, ret3;
-	char *buf = "Hello DSP.";
-	pthread_t thread1, thread2, thread3;
-	int depth = 8;
+	int ret3;
+	pthread_t thread3;
 	range_t sh_ctrl;
 	range_t dsp_ccsr;
 	range_t pa_ccsr;
@@ -177,13 +189,29 @@ void test_init()
 	       __TIME__);
 
 	usmmgr = fsl_usmmgr_init();
+	if (!usmmgr) {
+		printf("Error in Initializing User Space Memory Manager\n");
+		return;
+	}
 
 	/* get values from mmgr */
 	ret = get_pa_ccsr_area(&pa_ccsr, usmmgr);
-	ret = get_dsp_ccsr_area(&dsp_ccsr, usmmgr);
-	ret = get_shared_ctrl_area(&sh_ctrl, usmmgr);
+	if (ret) {
+		printf("Error in obtaining PA CCSR Area information\n");
+		return;
+	}
 
-	/* TBD : check return values */
+	ret = get_dsp_ccsr_area(&dsp_ccsr, usmmgr);
+	if (ret) {
+		printf("Error in obtaining DSP CCSR Area information\n");
+		return;
+	}
+
+	ret = get_shared_ctrl_area(&sh_ctrl, usmmgr);
+	if (ret) {
+		printf("Error in obtaining Shared Control Area information\n");
+		return;
+	}
 
 	ipc = fsl_ipc_init(test_p2v, sh_ctrl, dsp_ccsr, pa_ccsr);
 
@@ -196,7 +224,7 @@ void test_init()
 	printf("Trying to start a thread\n");
 	ret3 = pthread_create(&thread3, NULL, (void *)&channel67_thread, NULL);
 
-	printf("ptherad_create%d %d %d\n", ret1, ret2, ret3);
+	printf("ptherad_create %d\n", ret3);
 
 	while (!ch7init) {
 		printf(".");

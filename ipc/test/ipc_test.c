@@ -55,9 +55,11 @@ void dump_msg(char *msg, int len)
 	printf("\n");
 }
 
-void main()
+int main()
 {
 	test_init();
+
+	return 0;
 }
 
 ///////////////// Create Channels ////////////////////
@@ -65,14 +67,14 @@ int isbitset(uint64_t v, int bit)
 {
 	if ((v >> (63 - bit)) & 0x1)
 		return 1;
+
+	return 0;
 }
+
 void channel3_thread(void *ptr)
 {
-	uint64_t bmask;
 	phys_addr_t p;
 	uint32_t len;
-	int num_sent = 0;
-	int num_recv = 0;
 	int ret;
 	int ctr = 0;
 	int depth = 16;
@@ -94,7 +96,7 @@ void channel3_thread(void *ptr)
 			printf("\n ERROR ret %x \n", ret);
 			goto end;
 		}
-		printf("\nR:C3:P:[%x]L:%x\n", p, len);
+		printf("\nR:C3:P:[%lx]L:%x\n", p, len);
 
 		sprintf(bs, "MSG #%x", ctr++);
 		do {
@@ -113,7 +115,6 @@ end:
 }
 void channel4_thread(void *ptr)
 {
-	uint64_t bmask;
 	phys_addr_t p;
 	uint32_t len;
 	int ret;
@@ -137,9 +138,16 @@ void channel4_thread(void *ptr)
 			printf("\n ERROR ret %x \n", ret);
 			goto end;
 		}
-		printf("\nR:C4:P:[%x]L:%x\n", p, len);
+		printf("\nR:C4:P:[%lx]L:%x\n", p, len);
 
 		vaddr = fsl_usmmgr_p2v(p, usmmgr);
+		if (!vaddr) {
+			ret = -ERR_NULL_VALUE;
+			printf("\n Error in translating physical address %lx"
+			       " to virtual address\n", p);
+			goto end;
+		}
+
 		memcpy(retbuf, vaddr, len);
 		do {
 			ret = fsl_ipc_send_msg(5, retbuf, len, ipc);
@@ -164,13 +172,11 @@ void *test_p2v(phys_addr_t phys_addr)
 
 void test_init()
 {
-	range_t r;
 	uint64_t bmask;
 	int ret = 0;
-	int ret1, ret2, ret3;
+	int ret1, ret2;
 	char *buf = "Hello DSP.";
-	pthread_t thread1, thread2, thread3;
-	int depth = 8;
+	pthread_t thread1, thread2;
 	range_t sh_ctrl;
 	range_t dsp_ccsr;
 	range_t pa_ccsr;
@@ -179,13 +185,29 @@ void test_init()
 	printf("\n=========$IPC TEST$====%s %s====\n", __DATE__, __TIME__);
 
 	usmmgr = fsl_usmmgr_init();
+	if (!usmmgr) {
+		printf("Error in Initializing User Space Memory Manager\n");
+		return;
+	}
 
 	/* get values from mmgr */
 	ret = get_pa_ccsr_area(&pa_ccsr, usmmgr);
-	ret = get_dsp_ccsr_area(&dsp_ccsr, usmmgr);
-	ret = get_shared_ctrl_area(&sh_ctrl, usmmgr);
+	if (ret) {
+		printf("Error in obtaining PA CCSR Area information\n");
+		return;
+	}
 
-	/* TBD : check return values */
+	ret = get_dsp_ccsr_area(&dsp_ccsr, usmmgr);
+	if (ret) {
+		printf("Error in obtaining DSP CCSR Area information\n");
+		return;
+	}
+
+	ret = get_shared_ctrl_area(&sh_ctrl, usmmgr);
+	if (ret) {
+		printf("Error in obtaining Shared Control Area information\n");
+		return;
+	}
 
 	ipc = fsl_ipc_init(test_p2v, sh_ctrl, dsp_ccsr, pa_ccsr);
 
@@ -195,7 +217,7 @@ void test_init()
 	}
 	do {
 		fsl_ipc_chk_recv_status(&bmask, ipc);
-		printf("\n main loop #ret %x \n", bmask);
+		printf("\n main loop #ret %llx \n", bmask);
 		usleep(10000);
 	} while (!(isbitset(bmask, 0)));
 
@@ -206,7 +228,7 @@ void test_init()
 	ret1 = pthread_create(&thread1, NULL, (void *)&channel3_thread, NULL);
 	ret2 = pthread_create(&thread2, NULL, (void *)&channel4_thread, NULL);
 
-	printf("ptherad_create%d %d %d\n", ret1, ret2, ret3);
+	printf("ptherad_create %d %d\n", ret1, ret2);
 
 	while (!(ch3init && ch4init)) {
 		printf(".");

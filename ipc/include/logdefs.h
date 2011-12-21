@@ -39,7 +39,7 @@
 #define ENTER()	;
 #define EXIT(A)	;
 #endif
-#define DUMPR(R) printf("P=%x V=%x S=%x \n", (R)->phys_addr, (R)->vaddr,\
+#define DUMPR(R) printf("P=%lx V=%p S=%x \n", (R)->phys_addr, (R)->vaddr,\
 			(R)->size);
 #ifdef DBG
 #define debug_print(...)  printf(__VA_ARGS__);
