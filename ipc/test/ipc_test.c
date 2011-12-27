@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <unistd.h>
 #include <pthread.h>
 #include "fsl_usmmgr.h"
 #include "fsl_psc913x_ipc.h"

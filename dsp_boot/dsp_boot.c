@@ -50,6 +50,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/shm.h>
+#include <sys/ioctl.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
@@ -59,6 +60,7 @@
 #include <time.h>
 #include "fsl_het_mgr.h"
 #include "fsl_types.h"
+#include "fsl_ipc_shm.h"
 
 #define VERSION 	"1.1"
 /* defines */

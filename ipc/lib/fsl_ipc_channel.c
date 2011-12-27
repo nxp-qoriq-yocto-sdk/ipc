@@ -33,6 +33,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/ioctl.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
@@ -76,7 +77,6 @@ fsl_ipc_t fsl_ipc_init(ipc_p2v_t p2vcb, range_t sh_ctrl_area,
 		range_t dsp_ccsr, range_t pa_ccsr)
 {
 	int ret = ERR_SUCCESS;
-	struct sigaction sig_action;
 	ipc_userspace_t *ipc_priv = NULL;
 
 	ENTER();
@@ -135,6 +135,37 @@ void fsl_ipc_exit(fsl_ipc_t ipc)
 	free(ipc_priv);
 }
 
+/*
+ * @channel_attach_msg_ring
+ *
+ * This function attaches the ptr's to the msg buffers to the pointer ring.
+ *
+ * Type: Internal
+ */
+int ipc_channel_attach_msg_ring(uint32_t channel_id, phys_addr_t msg_phys_addr,
+				uint32_t msg_size, ipc_userspace_t *ipc_priv)
+{
+	int depth;
+	int err = ERR_SUCCESS;
+	int i = 0;
+
+	os_het_ipc_channel_t 	*ch;
+	os_het_ipc_bd_t	*bd_base;
+	os_het_ipc_bd_t	*bd;
+
+	ch =  get_channel_vaddr(channel_id, ipc_priv);
+	depth = ch->bd_ring_size;
+	bd_base = SH_CTRL_VADDR(ch->bd_base);
+
+	for (i = 0; i < depth; i++) {
+		bd = &bd_base[i];
+		bd->msg_ptr = msg_phys_addr;
+		msg_phys_addr += msg_size;
+	}
+
+	return err;
+}
+
 int fsl_ipc_configure_channel(uint32_t channel_id, uint32_t depth,
 			ipc_ch_type_t channel_type,
 			phys_addr_t msg_ring_paddr, uint32_t msg_size,
@@ -162,8 +193,9 @@ int fsl_ipc_configure_channel(uint32_t channel_id, uint32_t depth,
 	}
 
 	ch->ch_type = channel_type;
-	if (channel_type == OS_HET_IPC_MESSAGE_CH)
-		ipc_channel_attach_msg_ring(ch, msg_ring_paddr, msg_size);
+	if (channel_type == IPC_MSG_CH)
+		ipc_channel_attach_msg_ring(channel_id, msg_ring_paddr,
+					    msg_size, ipc_priv);
 
 	if (cbfunc) {
 		/* find a free rt signal */
@@ -790,7 +822,7 @@ void signal_handler(int signo, siginfo_t *siginfo, void *data)
 	void		*context;
 
 	ipc_channel_us_t *ch 		= NULL;
-	ipc_userspace_t	*ipc_priv = (ipc_userspace_t *)context;
+	ipc_userspace_t	*ipc_priv = (ipc_userspace_t *)data;
 
 	for (i = 0; i < ipc_priv->num_channels; i++) {
 		ch = ipc_priv->channels[i];
@@ -811,36 +843,6 @@ void signal_handler(int signo, siginfo_t *siginfo, void *data)
 	}
 }
 
-/*
- * @channel_attach_msg_ring
- *
- * This function attaches the ptr's to the msg buffers to the pointer ring.
- *
- * Type: Internal
- */
-int ipc_channel_attach_msg_ring(uint32_t channel_id, phys_addr_t msg_phys_addr,
-				uint32_t msg_size, ipc_userspace_t *ipc_priv)
-{
-	int depth;
-	int err = ERR_SUCCESS;
-	int i = 0;
-
-	os_het_ipc_channel_t 	*ch;
-	os_het_ipc_bd_t	*bd_base;
-	os_het_ipc_bd_t	*bd;
-
-	ch =  get_channel_vaddr(channel_id, ipc_priv);
-	depth = ch->bd_ring_size;
-	bd_base = SH_CTRL_VADDR(ch->bd_base);
-
-	for (i = 0; i < depth; i++) {
-		bd = &bd_base[i];
-		bd->msg_ptr = msg_phys_addr;
-		msg_phys_addr += msg_size;
-	}
-
-	return err;
-}
 /*
  * @get_channels_info
  *

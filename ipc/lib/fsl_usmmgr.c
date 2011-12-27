@@ -33,6 +33,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/shm.h>
+#include <sys/ioctl.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
@@ -110,54 +111,6 @@ int fsl_usmmgr_memalign(range_t *r, unsigned long align, fsl_usmmgr_t usmmgr)
 void fsl_usmmgr_free(range_t *r, fsl_usmmgr_t usmmgr)
 {
 	shm_free(r->vaddr);
-}
-
-fsl_usmmgr_t fsl_usmmgr_init(void)
-{
-	int ret;
-	void *ptr_ret;
-	ENTER();
-
-	ret = ERR_SUCCESS;
-	usmmgr_priv *priv = malloc(sizeof(usmmgr_priv));
-
-	if (!priv)
-		goto end;
-
-	priv->mapidx = 0;
-	priv->dev_het_mgr = 0;
-	priv->dev_mem = 0;
-
-	memset(&priv->shared_area, 0, sizeof(range_t));
-	memset(&priv->dsp_ccsr, 0, sizeof(range_t));
-	memset(&priv->pa_ccsr, 0, sizeof(range_t));
-	memset(priv->map, 0, MAX_MAP_NUM*sizeof(range_t));
-	memset(&priv->het_sys_map, 0, sizeof(sys_map_t));
-
-	ptr_ret = fsl_shm_init(0);
-	if (!ptr_ret)
-		goto end;
-
-	ret = init_het_mgr(priv);
-	if (ret)
-		goto end;
-
-	ret = init_dev_mem(priv);
-	if (ret)
-		goto end;
-
-	ret = map_shared_mem(priv);
-	if (ret)
-		goto end;
-end:
-	if (ret) {
-		cleanup(priv);
-		free(priv);
-		priv = NULL;
-	}
-
-	EXIT(ret);
-	return priv;
 }
 
 void cleanup(usmmgr_priv *priv)
@@ -240,6 +193,54 @@ int map_shared_mem(usmmgr_priv *priv)
 end:
 	EXIT(ret);
 	return ret;
+}
+
+fsl_usmmgr_t fsl_usmmgr_init(void)
+{
+	int ret;
+	void *ptr_ret;
+	ENTER();
+
+	ret = ERR_SUCCESS;
+	usmmgr_priv *priv = malloc(sizeof(usmmgr_priv));
+
+	if (!priv)
+		goto end;
+
+	priv->mapidx = 0;
+	priv->dev_het_mgr = 0;
+	priv->dev_mem = 0;
+
+	memset(&priv->shared_area, 0, sizeof(range_t));
+	memset(&priv->dsp_ccsr, 0, sizeof(range_t));
+	memset(&priv->pa_ccsr, 0, sizeof(range_t));
+	memset(priv->map, 0, MAX_MAP_NUM*sizeof(range_t));
+	memset(&priv->het_sys_map, 0, sizeof(sys_map_t));
+
+	ptr_ret = fsl_shm_init(0);
+	if (!ptr_ret)
+		goto end;
+
+	ret = init_het_mgr(priv);
+	if (ret)
+		goto end;
+
+	ret = init_dev_mem(priv);
+	if (ret)
+		goto end;
+
+	ret = map_shared_mem(priv);
+	if (ret)
+		goto end;
+end:
+	if (ret) {
+		cleanup(priv);
+		free(priv);
+		priv = NULL;
+	}
+
+	EXIT(ret);
+	return priv;
 }
 
 int get_shared_ctrl_area(range_t *r, fsl_usmmgr_t usmmgr)

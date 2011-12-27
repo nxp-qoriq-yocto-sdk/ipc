@@ -27,8 +27,10 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <sys/shm.h>
+#include <sys/ioctl.h>
 #include<linux/fs.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "lg_shm.h"
 
