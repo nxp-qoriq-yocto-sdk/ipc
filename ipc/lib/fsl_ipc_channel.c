@@ -1,34 +1,9 @@
 /*
  *  @ fsl_ipc_channel.c
  *
- * Copyright (c) 2011
- *  Freescale Semiconductor Inc.  All rights reserved.
+ * Copyright 2011-2012 Freescale Semiconductor, Inc.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of Freescale Semiconductor Inc nor the names of its
- *    contributors may be used to endorse or promote products derived from
- *    this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- *
- *      Author: Manish Jaggi <manish.jaggi@freescale.com>
+ * Author: Manish Jaggi <manish.jaggi@freescale.com>
  */
 #include <stdio.h>
 #include <fcntl.h>
@@ -81,15 +56,16 @@ fsl_ipc_t fsl_ipc_init(ipc_p2v_t p2vcb, range_t sh_ctrl_area,
 
 	ENTER();
 
+	if (!p2vcb) {
+		ret = -ERR_P2V_NULL;
+		goto end;
+	}
+
 	/* Allocate memory for ipc instance */
 	ipc_priv = malloc(sizeof(ipc_userspace_t));
 	if (!ipc_priv)
 		goto end;
 
-	if (!p2vcb) {
-		ret = -ERR_P2V_NULL;
-		goto end;
-	}
 	memset(ipc_priv, 0, sizeof(ipc_userspace_t));
 	ipc_priv->p2vcb = p2vcb;
 
@@ -112,6 +88,8 @@ end:
 	EXIT(ret);
 	if (ret) /* if ret non zero free ipc_priv */
 		if (ipc_priv) {
+			if (!(ipc_priv->dev_het_ipc == -1))
+				close(ipc_priv->dev_het_ipc);
 			free(ipc_priv);
 			ipc_priv = NULL;
 		}
@@ -192,6 +170,16 @@ int fsl_ipc_configure_channel(uint32_t channel_id, uint32_t depth,
 		goto end;
 	}
 
+	debug_print("/* allocate ipc_channel_us_t */\n");
+	uch = calloc(1, sizeof(ipc_channel_us_t));
+	if (!uch) {
+		debug_print("Memory Allocation Failure with error %d\n",
+			    errno);
+		ret = -ERR_CALLOC;
+		EXIT(ret);
+		goto end;
+	}
+
 	ch->ch_type = channel_type;
 	if (channel_type == IPC_MSG_CH)
 		ipc_channel_attach_msg_ring(channel_id, msg_ring_paddr,
@@ -204,6 +192,7 @@ int fsl_ipc_configure_channel(uint32_t channel_id, uint32_t depth,
 			debug_print("No Free signal found!!! signal=%d\n",
 				signal);
 			ret = -ERR_NO_SIGNAL_FOUND;
+			free(uch);
 			EXIT(ret);
 			goto end;
 		}
@@ -212,29 +201,30 @@ int fsl_ipc_configure_channel(uint32_t channel_id, uint32_t depth,
 		 * the ipc kernel driver finds a way for DSP to interrupt
 		 * the PA, either using MSG or MSI interrupt.
 		 */
-		rc.channel_id = channel_id;
-		rc.signal = signal;
-
 		sig_action.sa_sigaction = signal_handler;
 		sig_action.sa_flags = SA_SIGINFO;
 		ret = sigaction(signal, &sig_action, NULL);
+		if (ret) {
+			debug_print("Error %d while registering signal handler"
+				    " for signal %d\n", errno, signal);
+			free(uch);
+			EXIT(ret);
+			goto end;
+		}
+
+		rc.channel_id = channel_id;
+		rc.signal = signal;
 
 		ret = ioctl(ipc_priv->dev_het_ipc, IOCTL_IPC_REGISTER_SIGNAL,
 				&rc);
 		if (!ret) {
 			ret = -ERR_IOCTL_FAIL;
+			free(uch);
 			EXIT(ret);
 			goto end;
 		}
 	} else
 		ch->ipc_ind = OS_HET_NO_INT;
-	debug_print("/* allocate ipc_channel_us_t */\n");
-	uch = calloc(1, sizeof(ipc_channel_us_t));
-	if (!uch) {
-		ret = -ERR_CALLOC;
-		EXIT(ret);
-		goto end;
-	}
 
 	debug_print("/* attach the channel to the list */\n");
 	ipc_priv->channels[ipc_priv->num_channels++] = uch;
@@ -263,6 +253,8 @@ int fsl_ipc_configure_txreq(uint32_t channel_id, phys_addr_t phys_addr,
 	ENTER();
 
 	ipc_priv = (ipc_userspace_t *) ipc;
+	if (channel_id >= ipc_priv->max_channels)
+		return -ERR_CHANNEL_NOT_FOUND;
 
 	ipc_ch = get_channel_vaddr(channel_id, ipc_priv);
 
@@ -658,6 +650,8 @@ int fsl_ipc_recv_ptr(uint32_t channel_id, phys_addr_t *addr, uint32_t *len,
 	ENTER();
 
 	ipc_priv = (ipc_userspace_t *)ipc;
+	if (channel_id >= ipc_priv->max_channels)
+		return -ERR_CHANNEL_NOT_FOUND;
 
 	ipc_ch = get_channel_vaddr(channel_id, ipc_priv);
 
@@ -743,7 +737,7 @@ int fsl_ipc_recv_msg(uint32_t channel_id, void *addr, uint32_t *len,
 	return 0;
 }
 
-int fsl_ipc_recv_msg_ptr(uint32_t channel_id, void *dst_buffer,
+int fsl_ipc_recv_msg_ptr(uint32_t channel_id, void **dst_buffer,
 			uint32_t *len, fsl_ipc_t ipc)
 {
 	 os_het_ipc_bd_t		*bd_base;
@@ -768,7 +762,7 @@ int fsl_ipc_recv_msg_ptr(uint32_t channel_id, void *dst_buffer,
 	/* bd = &bd_base[ipc_ch->tracker.consumer_num]; */
 	bd = &bd_base[ipc_ch->LOCAL_CONSUMER_NUM];
 
-	dst_buffer = (*ipc_priv->p2vcb)(bd->msg_ptr);
+	*dst_buffer = (*ipc_priv->p2vcb)(bd->msg_ptr);
 	*len = bd->msg_len;
 
 	return ERR_SUCCESS;

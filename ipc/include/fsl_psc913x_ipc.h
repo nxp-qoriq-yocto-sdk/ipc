@@ -1,34 +1,9 @@
 /*
  * @fsl_psc913x_ipc.h
  *
- * Copyright (c) 2011
- *  Freescale Semiconductor Inc.  All rights reserved.
+ * Copyright 2011-2012 Freescale Semiconductor, Inc.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of Freescale Semiconductor Inc nor the names of its
- *    contributors may be used to endorse or promote products derived from
- *    this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- *
- *      Author: Manish Jaggi <manish.jaggi@freescale.com>
+ * Author: Manish Jaggi <manish.jaggi@freescale.com>
  */
 
 #ifndef FSL_PSC913x_IPC_H_
@@ -359,8 +334,7 @@ int fsl_ipc_recv_msg(uint32_t channel_id, void *dst_buffer, uint32_t *len,
  *
  * channel_id 	- [IN][M] unique id of the channel
  *
- * addr 		- [IN][M] IPC copies from the message ring into
- *			the buffer pointer provided by the consumer
+ * dst_buffer 	- [OUT][M] IPC copies the virtual address of message buffer
  *
  * len 		- [IN][M] length of the copied buffer
  *
@@ -368,7 +342,7 @@ int fsl_ipc_recv_msg(uint32_t channel_id, void *dst_buffer, uint32_t *len,
  * 	ERR_SUCCESS - no error
  * 	Non zero value - error (check fsl_ipc_errorcodes.h)
  ****************************************************************************/
-int fsl_ipc_recv_msg_ptr(uint32_t channel_id, void *dst_buffer, uint32_t *len,
+int fsl_ipc_recv_msg_ptr(uint32_t channel_id, void **dst_buffer, uint32_t *len,
 			fsl_ipc_t ipc);
 
 /*****************************************************************************
