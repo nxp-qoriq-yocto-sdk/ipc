@@ -28,6 +28,7 @@
 #include <sys/ioctl.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <errno.h>
 #include <signal.h>
 #include <string.h>
 #include <stdio.h>
@@ -329,12 +330,20 @@ int load_dsp_image(char *fname)
 
 		/*Read addr and size */
 		ret = fread(&addr, 4, 1, dspbin);
-		if (!ret)
+		if (!ret) {
+			if (ferror(dspbin))
+				printf("%s: File read error - %d\n",
+				       fname, errno);
 			break;
-		ret = fread(&size, 4, 1, dspbin);
+		}
 
-		if (!ret)
+		ret = fread(&size, 4, 1, dspbin);
+		if (!ret) {
+			if (ferror(dspbin))
+				printf("%s: File read error - %d\n",
+				       fname, errno);
 			break;
+		}
 
 		vaddr = p2v(addr);
 		if (!vaddr) {
