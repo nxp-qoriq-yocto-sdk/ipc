@@ -257,7 +257,12 @@ int fsl_ipc_configure_txreq(uint32_t channel_id, phys_addr_t phys_addr,
 		return -ERR_CHANNEL_NOT_FOUND;
 
 	ipc_ch = get_channel_vaddr(channel_id, ipc_priv);
-
+	if (ipc_ch->producer_initialized != OS_HET_INITIALIZED) {
+		printf("Producer must open TxReq channel %d before doing "
+		       "its configuration\n", channel_id);
+		EXIT(0);
+		return -ERR_PRODUCER_NOT_INIT;
+	}
 
 	debug_print("Params %x %x %x \n", channel_id, phys_addr,
 			max_txreq_lbuff_size);
