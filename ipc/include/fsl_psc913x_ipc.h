@@ -49,8 +49,7 @@ typedef struct {
  *
  * src_addr 	-	dma_capable_physical_addr;
  *
- * is_tb_start 	-	if set, the src_address is a 32bit aligned. This should
- * 			 be set for the first tb part.
+ * is_tb_start	-	This field is currently ignored.
  *
  * len		- 	length of tb part
  *
