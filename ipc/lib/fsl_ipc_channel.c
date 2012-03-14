@@ -315,6 +315,10 @@ int fsl_ipc_send_tx_req(uint32_t channel_id, sg_list_t *sgl,
 	ipc_priv = (ipc_userspace_t *)ipc;
 
 	ipc_ch = get_channel_vaddr(channel_id, ipc_priv);
+	if (ipc_ch->consumer_initialized != OS_HET_INITIALIZED) {
+		debug_print("Error: consumer not initialized\n");
+		return -ERR_CONSUMER_NOT_INIT;
+	}
 
 	/* check if the channel is full */
 	if (OS_HET_CH_FULL(ipc_ch)) {
@@ -517,9 +521,9 @@ int fsl_ipc_send_ptr(uint32_t channel_id, phys_addr_t addr, uint32_t len,
 	ipc_ch = get_channel_vaddr(channel_id, ipc_priv);
 
 	/* check if the channel is init by the consumer */
-	if (!ipc_ch->consumer_initialized) {
+	if (ipc_ch->consumer_initialized != OS_HET_INITIALIZED) {
 		debug_print("Error: consumer not initialized\n");
-		return -1;
+		return -ERR_CONSUMER_NOT_INIT;
 	}
 
 	/* check if the channel is full */
@@ -599,10 +603,10 @@ int fsl_ipc_send_msg(uint32_t channel_id, void *src_buf_addr, uint32_t len,
 
 	ipc_ch->producer_initialized = OS_HET_INITIALIZED;
 	/* check if the channel is init by the consumer */
-	if (!ipc_ch->consumer_initialized) {
+	if (ipc_ch->consumer_initialized != OS_HET_INITIALIZED) {
 		debug_print("Error: consumer not initialized\n");
 		EXIT(-1);
-		return -1;
+		return -ERR_CONSUMER_NOT_INIT;
 	}
 	debug_print("\n num free bds = %d \n", OS_HET_CH_FREE_BDS(ipc_ch));
 
@@ -659,6 +663,10 @@ int fsl_ipc_recv_ptr(uint32_t channel_id, phys_addr_t *addr, uint32_t *len,
 		return -ERR_CHANNEL_NOT_FOUND;
 
 	ipc_ch = get_channel_vaddr(channel_id, ipc_priv);
+	if (ipc_ch->producer_initialized != OS_HET_INITIALIZED) {
+		debug_print("Error: producer not initialized\n");
+		return -ERR_PRODUCER_NOT_INIT;
+	}
 
 	/* check if the channel is full */
 	if (OS_HET_CH_EMPTY(ipc_ch))
