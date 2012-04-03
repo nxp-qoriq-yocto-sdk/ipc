@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include "fsl_usmmgr.h"
-#include "fsl_psc913x_ipc.h"
+#include "fsl_bsc913x_ipc.h"
 #include "fsl_ipc_errorcodes.h"
 
 #define ENTER()	printf(">> %s %d %s\n", __FILE__, __LINE__, __func__)

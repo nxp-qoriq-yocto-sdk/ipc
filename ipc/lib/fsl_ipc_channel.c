@@ -20,10 +20,10 @@
 #include "fsl_ipc_um.h"
 #include "fsl_usmmgr.h"
 #include "fsl_ipc_kmod.h"
-#include "fsl_psc913x_ipc.h"
+#include "fsl_bsc913x_ipc.h"
 #include "fsl_ipc_errorcodes.h"
-#include "psc913x_heterogeneous.h"
-#include "psc913x_heterogeneous_ipc.h"
+#include "bsc913x_heterogeneous.h"
+#include "bsc913x_heterogeneous_ipc.h"
 
 #define LOCAL_PRODUCER_NUM pa_reserved[0]
 #define LOCAL_CONSUMER_NUM pa_reserved[1]
