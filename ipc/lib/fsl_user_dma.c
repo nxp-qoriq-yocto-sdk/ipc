@@ -1,7 +1,7 @@
 /*
  * @fsl_user_dma.c
  *
- * Copyright (c) 2011
+ * Copyright (c) 2011-2012
  *  Freescale Semiconductor Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -59,7 +59,7 @@
 
 #define VTOP(A)		((A) - &dma_priv->dma_list[i+1] + \
 					dma_priv->dma_list_mem.phys_addr)
-#define MAX_DMA_ENTRIES	16
+#define MAX_DMA_ENTRIES	144
 /*****************************************************************************
  * @dma_regs_t
  *
