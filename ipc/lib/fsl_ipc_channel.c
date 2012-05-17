@@ -161,6 +161,8 @@ int fsl_ipc_configure_channel(uint32_t channel_id, uint32_t depth,
 	ipc_priv = (ipc_userspace_t *) ipc;
 
 	ch = get_channel_vaddr(channel_id, ipc_priv);
+	if (ch->consumer_initialized == OS_HET_INITIALIZED)
+		return ret;
 
 	if (ch->bd_ring_size <= ipc_priv->max_depth)
 		ch->bd_ring_size = depth;
