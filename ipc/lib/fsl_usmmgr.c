@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/shm.h>
+#include <sys/sem.h>
 #include <sys/ioctl.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -170,15 +171,92 @@ end:
 	return ret;
 }
 
+static int fsl_usmmgr_sem_lock()
+{
+	int rc = 0;
+	int semid;
+	key_t key = getpid();
+	int semflg = IPC_CREAT | 0666;
+	int nsems = 1, nsops = 2;
+	struct sembuf sops[2];
+
+	semid = semget(key, nsems, semflg);
+	if (semid < 0) {
+		perror("semget: semget failed");
+		rc = -1;
+		goto end;
+	} else {
+		sops[0].sem_num = 0;
+		sops[0].sem_op = 0;
+		sops[0].sem_flg = SEM_UNDO;
+
+		sops[1].sem_num = 0;
+		sops[1].sem_op = 1;
+		sops[1].sem_flg = SEM_UNDO | IPC_NOWAIT;
+
+		rc = semop(semid, sops, nsops);
+		if (rc < 0) {
+			perror("semop: semop failed");
+			rc = -1;
+			goto end;
+		}
+	}
+
+end:
+	return rc;
+}
+
+static int fsl_usmmgr_sem_unlock()
+{
+	int rc = 0;
+	int semid;
+	key_t key = getpid();
+	int semflg = IPC_CREAT | 0666;
+	int nsems = 1, nsops = 1;
+	struct sembuf sops;
+
+	semid = semget(key, nsems, semflg);
+	if (semid < 0) {
+		perror("semget: semget failed");
+		rc = -1;
+		goto end;
+	} else {
+		sops.sem_num = 0;
+		sops.sem_op = -1;
+		sops.sem_flg = SEM_UNDO | IPC_NOWAIT;
+
+		rc = semop(semid, &sops, nsops);
+		if (rc < 0) {
+			perror("semop: semop failed");
+			rc = -1;
+			goto end;
+		}
+	}
+
+end:
+	return rc;
+}
+
+
 fsl_usmmgr_t fsl_usmmgr_init(void)
 {
-	int ret;
+	int ret = ERR_SUCCESS;
 	void *ptr_ret;
+	static uint8_t usmmgr_initialized;
+	static usmmgr_priv *priv;
+
 	ENTER();
 
-	ret = ERR_SUCCESS;
-	usmmgr_priv *priv = malloc(sizeof(usmmgr_priv));
+	ret = fsl_usmmgr_sem_lock();
+	if (ret)
+		return NULL;
 
+	if (usmmgr_initialized) {
+		fsl_usmmgr_sem_unlock();
+		return priv;
+	}
+
+	priv = malloc(sizeof(usmmgr_priv));
 	if (!priv)
 		goto end;
 
@@ -207,6 +285,8 @@ fsl_usmmgr_t fsl_usmmgr_init(void)
 	ret = map_shared_mem(priv);
 	if (ret)
 		goto end;
+
+	usmmgr_initialized = 1;
 end:
 	if (ret) {
 		cleanup(priv);
@@ -214,6 +294,7 @@ end:
 		priv = NULL;
 	}
 
+	fsl_usmmgr_sem_unlock();
 	EXIT(ret);
 	return priv;
 }
