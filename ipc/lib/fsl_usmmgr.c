@@ -53,6 +53,13 @@ typedef struct {
 	range_t pa_ccsr;
 } usmmgr_priv;
 
+union semun {
+	int val;
+	struct semid_ds *buf;
+	unsigned short  *array;
+	struct seminfo  *__buf;
+};
+
 void cleanup(usmmgr_priv *priv);
 /* */
 
@@ -237,6 +244,30 @@ end:
 	return rc;
 }
 
+static int fsl_usmmgr_sem_destroy()
+{
+	key_t key = getpid();
+	int semid;
+	union semun arg;
+	int rc = 0;
+
+	semid = semget(key, 1, 0);
+	if (semid == -1) {
+		perror("Unable to obtain semid for"
+					" fsl_usmmgr semaphore\r\n");
+		rc = -1;
+		goto out;
+	}
+
+	if (semctl(semid, 0, IPC_RMID, arg) == -1) {
+		perror("Unable to destroy fsl_usmmgr semaphore\r\n");
+		rc = -1;
+		goto out;
+	}
+
+out:
+	return rc;
+}
 
 fsl_usmmgr_t fsl_usmmgr_init(void)
 {
@@ -297,6 +328,15 @@ end:
 	fsl_usmmgr_sem_unlock();
 	EXIT(ret);
 	return priv;
+}
+
+int fsl_usmmgr_exit(fsl_usmmgr_t usmmgr)
+{
+	int rc = 0;
+
+	rc = fsl_usmmgr_sem_destroy();
+
+	return rc;
 }
 
 int get_shared_ctrl_area(range_t *r, fsl_usmmgr_t usmmgr)
