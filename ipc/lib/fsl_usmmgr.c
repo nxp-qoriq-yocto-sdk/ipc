@@ -162,7 +162,7 @@ int map_shared_mem(usmmgr_priv *priv)
 		priv->het_sys_map.dsp_core0_m2.size);
 	if (vaddr == MAP_FAILED)
 		return -1;
-#ifdef PSC9132
+
 	MMAP(priv->het_sys_map.dsp_core1_m2.phys_addr,
 		priv->het_sys_map.dsp_core1_m2.size);
 	if (vaddr == MAP_FAILED)
@@ -172,7 +172,6 @@ int map_shared_mem(usmmgr_priv *priv)
 		priv->het_sys_map.dsp_m3.size);
 	if (vaddr == MAP_FAILED)
 		return -1;
-#endif
 end:
 	EXIT(ret);
 	return ret;
