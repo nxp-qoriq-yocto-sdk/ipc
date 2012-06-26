@@ -38,7 +38,7 @@
 #include "fsl_types.h"
 #include "fsl_ipc_shm.h"
 
-#define VERSION 	"1.1"
+#define VERSION 	"1.1.01"
 /* defines */
 #define MAX_ENTRIES	10
 /* PA CCSR */
@@ -54,23 +54,13 @@
 #define MB_256		0x10000000
 #define IPC_SHMEM	MB_256
 
-#define SMAP(I, A, B, C)	\
+#define ADDTOMAP(PHYS, SZ)	\
 			do {	\
-				map[I].phys_addr = A;	\
-				map[I].vaddr = B; \
-				map[I].size = C; \
-			} while (0);
-
-#define MMAP(P, SZ)	\
-			do {	\
-				vaddr = mmap(0, SZ, (PROT_READ | \
-						PROT_WRITE), MAP_SHARED,\
-						dev_mem, P);	\
-				SMAP(mapidx, P, vaddr, SZ);\
-				mapidx++;	\
-			} while (0);
-
-#define MUNMAP(P, SZ)	munmap((void *)(P), (SZ));
+				map[mapidx].phys_addr = PHYS;	\
+				map[mapidx].vaddr = NULL; \
+				map[mapidx].size = SZ; \
+			} while (0);	\
+			mapidx++;
 
 /*
  * Global Variables
@@ -81,7 +71,6 @@ int dev_mem;
 int dev_het_mgr;
 sys_map_t het_sys_map;
 
-range_t map[MAX_ENTRIES];
 range_t map[MAX_ENTRIES];
 int mapidx;
 
@@ -105,15 +94,15 @@ void dump_sys_map()
 	printf("DSP Core0 M2: Addr=%lx Size=%x\n",
 		het_sys_map.dsp_core0_m2.phys_addr,
 		het_sys_map.dsp_core0_m2.size);
-#ifdef PSC9132
-	printf("DSP Core1 M2: Addr=%x Size=%x\n",
+
+	printf("DSP Core1 M2: Addr=%lx Size=%x\n",
 		het_sys_map.dsp_core1_m2.phys_addr,
 		het_sys_map.dsp_core1_m2.size);
 
-	printf("DSP M3: Addr=%x Size=%x\n",
+	printf("DSP M3: Addr=%lx Size=%x\n",
 		het_sys_map.dsp_m3.phys_addr,
 		het_sys_map.dsp_m3.size);
-#endif
+
 	printf("PA CCSRBAR: Addr =%lx Size=%x\n",
 		het_sys_map.pa_ccsrbar.phys_addr,
 		het_sys_map.pa_ccsrbar.size);
@@ -123,21 +112,42 @@ void dump_sys_map()
 		het_sys_map.dsp_ccsrbar.size);
 }
 
-/*
- * @p2v
- *
- */
-void *p2v(phys_addr_t phys_addr)
+void *map_area(phys_addr_t phys_addr, unsigned int  *sz)
 {
 	int i;
-	for (i = 0; i < mapidx; i++) {
+	void *vaddr = NULL;;
+	uint32_t diff;
+	int size = *sz;
+	phys_addr_t nphys_addr;
+	nphys_addr = phys_addr & 0xfffff000;
+	if (phys_addr + size > nphys_addr + 0x1000)
+		size = (size + 0x1000) & 0xfffff000;
+
+	size += 0x1000 - size % 0x1000;
+	diff = phys_addr - nphys_addr;
+
+	for (i = 0; i < mapidx; i++)
 		if (phys_addr >= map[i].phys_addr &&
 		    phys_addr < map[i].phys_addr + map[i].size) {
-			return (void *)(phys_addr - map[i].phys_addr) +
-			    (uint32_t) map[i].vaddr;
+			vaddr = mmap(0, size, (PROT_READ | \
+				PROT_WRITE), MAP_SHARED,\
+					dev_mem, nphys_addr);
+			break;
 		}
+
+	if (vaddr) {
+		*sz = size;
+		vaddr += diff;
+		return vaddr;
 	}
+
 	return NULL;
+
+}
+
+void unmap_area(void *vaddr, unsigned int size)
+{
+	munmap((void *)((uint32_t)vaddr & 0xfffff000), size);
 }
 
 /*
@@ -252,10 +262,9 @@ int init_hetmgr()
 	return ret;
 }
 
-int map_memory_areas()
+int assign_memory_areas()
 {
 	int ret = 0;
-	void *vaddr;
 	/* open /dev/mem
 	 * map dsp m2/m3/ddr
 	 */
@@ -274,33 +283,19 @@ int map_memory_areas()
 		printf("Incorrect params\n");
 		return -1;
 	}
-
-	/* MAP DSP private area in ddr */
-	MMAP(het_sys_map.smart_dsp_os_priv_area.phys_addr,
-	     het_sys_map.smart_dsp_os_priv_area.size);
-
-	if (vaddr == MAP_FAILED)
-		return -1;
-
-	MMAP(het_sys_map.dsp_core0_m2.phys_addr, het_sys_map.dsp_core0_m2.size);
-	if (vaddr == MAP_FAILED)
-		return -1;
-#ifdef PSC9132
-	MMAP(het_sys_map.dsp_core1_m2.phys_addr, het_sys_map.dsp_core1_m2.size);
-	if (vaddr == MAP_FAILED)
-		return -1;
-
-	MMAP(het_sys_map.dsp_m3.phys_addr, het_sys_map.dsp_m3.size);
-	if (vaddr == MAP_FAILED)
-		return -1;
-#endif
-	MMAP(het_sys_map.pa_ccsrbar.phys_addr, het_sys_map.pa_ccsrbar.size);
-	if (vaddr == MAP_FAILED)
-		return -1;
-
-	MMAP(het_sys_map.dsp_ccsrbar.phys_addr, het_sys_map.dsp_ccsrbar.size);
-	if (vaddr == MAP_FAILED)
-		return -1;
+	mapidx = 0;
+	ADDTOMAP(het_sys_map.smart_dsp_os_priv_area.phys_addr,
+		het_sys_map.smart_dsp_os_priv_area.size);
+	ADDTOMAP(het_sys_map.dsp_core0_m2.phys_addr,
+		het_sys_map.dsp_core0_m2.size);
+	ADDTOMAP(het_sys_map.dsp_core1_m2.phys_addr,
+		het_sys_map.dsp_core1_m2.size);
+	ADDTOMAP(het_sys_map.dsp_m3.phys_addr,
+		het_sys_map.dsp_m3.size);
+	ADDTOMAP(het_sys_map.pa_ccsrbar.phys_addr,
+		het_sys_map.pa_ccsrbar.size);
+	ADDTOMAP(het_sys_map.dsp_ccsrbar.phys_addr,
+		het_sys_map.dsp_ccsrbar.size);
 
 	return ret;
 }
@@ -317,6 +312,7 @@ int load_dsp_image(char *fname)
 	uint32_t addr, size;
 	void *vaddr;
 	int ret = 0;
+	uint32_t tsize = 0;
 	dspbin = fopen(fname, "rb");
 	if (!dspbin) {
 		printf("%s File not found, exiting", fname);
@@ -345,15 +341,23 @@ int load_dsp_image(char *fname)
 			break;
 		}
 
-		vaddr = p2v(addr);
+		if (!size)
+			continue;
+
+		tsize = size;
+		vaddr = map_area(addr, &tsize);
 		if (!vaddr) {
 			ret = -1;
-			printf("\n Error in translating physical address %#x"
-			       " to virtual address\n", addr);
+			printf("\n Error in mapping physical address %x"
+			" to virtual address\n", addr);
 			goto end_close_file;
 		}
 
+		printf("\n Copy Part %x %x\n", addr, size);
 		ret = copy_file_part(vaddr, size, dspbin);
+
+		unmap_area(vaddr, tsize);
+
 		if (ret)
 			goto end_close_file;
 	}
@@ -366,18 +370,22 @@ end:
 
 static inline int dsp_ready_set()
 {
-	volatile uint32_t *vaddr;
+	void *vaddr;
 	int ret;
 	uint32_t val;
 	ret = 0;
-	vaddr = p2v(het_sys_map.pa_ccsrbar.phys_addr + DSPSR);
+	uint32_t tsize = 4;
+
+	phys_addr_t phys_addr = het_sys_map.pa_ccsrbar.phys_addr + DSPSR;
+	vaddr = map_area(phys_addr, &tsize);
 	if (!vaddr) {
-		printf("\nError in translating physical address %lx to virtual"
-		       "address\n", het_sys_map.pa_ccsrbar.phys_addr + DSPSR);
+		printf("\nError in mapping physical address %lx to virtual"
+		       "address\n", phys_addr);
 		return -1;
 	}
+	val = *((volatile uint32_t*)vaddr);
+	unmap_area((void *)vaddr, tsize);
 
-	val = *vaddr;
 	if (val & DSPSR_DSP1_READY) {
 		printf("DSP READY SET\n");
 		return ret;
@@ -390,20 +398,24 @@ int set_sh_ctrl_pa_init()
 	return ioctl(dev_het_mgr, IOCTL_HET_MGR_SET_INITIALIZED, 0);
 }
 
-static inline void set_ppc_ready()
+static inline int set_ppc_ready()
 {
-	uint32_t *vaddr;
-
+	volatile uint32_t *vaddr;
+	uint32_t tsize = 4;
 	/* write to ppc ready */
-	vaddr = p2v(het_sys_map.dsp_ccsrbar.phys_addr + DSP_GCR + PASTATE);
+	phys_addr_t phys_addr = het_sys_map.dsp_ccsrbar.phys_addr + DSP_GCR
+				+ PASTATE;
+	vaddr = map_area(phys_addr, &tsize);
 	if (!vaddr) {
-		printf("\nError in translating physical address %lx to virtual"
+		printf("\nError in physical address %lx to virtual"
 		       "address\n",
 		       het_sys_map.dsp_ccsrbar.phys_addr + DSP_GCR + PASTATE);
-		return;
+		return -1;
 	}
 
 	*vaddr |= PASTATE_PAREADY;
+	unmap_area((void *)vaddr, tsize);
+	return 0;
 }
 
 static inline int init_hugetlb(void)
@@ -460,7 +472,7 @@ int main(int argc, char **argv)
 	if (init_devmem())
 		goto end;
 
-	if (map_memory_areas())
+	if (assign_memory_areas())
 		goto end;
 
 	if (init_hugetlb())
@@ -488,26 +500,8 @@ end:
 	return ret;
 }
 
-void unmap_memory_areas()
-{
-	MUNMAP(het_sys_map.smart_dsp_os_priv_area.phys_addr,
-	       het_sys_map.smart_dsp_os_priv_area.size);
-
-	MUNMAP(het_sys_map.dsp_core0_m2.phys_addr,
-	       het_sys_map.dsp_core0_m2.size);
-#ifdef PSC9132
-	MUNMAP(het_sys_map.dsp_core1_m2.phys_addr,
-	       het_sys_map.dsp_core1_m2.size);
-
-	MUNMAP(het_sys_map.dsp_m3.phys_addr, het_sys_map.dsp_m3.size);
-#endif
-	MUNMAP(het_sys_map.pa_ccsrbar.phys_addr, het_sys_map.pa_ccsrbar.size);
-	MUNMAP(het_sys_map.dsp_ccsrbar.phys_addr, het_sys_map.dsp_ccsrbar.size);
-}
-
 void cleanup()
 {
-	unmap_memory_areas();
 	close(dev_mem);
 	close(dev_het_mgr);
 }
