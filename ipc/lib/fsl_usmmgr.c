@@ -23,6 +23,8 @@
 #include "fsl_ipc_errorcodes.h"
 #include "bsc913x_heterogeneous.h"
 
+#define BSC9132_MODEL_STR	"fsl,bsc9132"
+
 #define SMAP(I, A, B, C) do {	\
 			priv->map[I].phys_addr = A;   \
 			priv->map[I].vaddr = B; \
@@ -136,8 +138,26 @@ int map_shared_mem(usmmgr_priv *priv)
 {
 	int ret = ERR_SUCCESS;
 	void *vaddr;
-
+	FILE *fp;
+	char model_str[16] = {0};
+	int bytes =  strlen(BSC9132_MODEL_STR);
 	ENTER();
+	/* open /proc/device-tree/model to find
+	basc9132/bsc9131
+	*/
+	fp = fopen("/proc/device-tree/model", "rb");
+	if (!fp) {
+		printf("Unable to open /proc/device-tree/model\n");
+		ret = -1;
+		goto end;
+	}
+
+	ret = fread(model_str, bytes, 1, fp);
+	fclose(fp);
+
+	if (!ret)
+		goto end;
+
 	/* open /dev/mem
 	 * map dsp m2/m3/ddr
 	 */
@@ -163,15 +183,17 @@ int map_shared_mem(usmmgr_priv *priv)
 	if (vaddr == MAP_FAILED)
 		return -1;
 
-	MMAP(priv->het_sys_map.dsp_core1_m2.phys_addr,
-		priv->het_sys_map.dsp_core1_m2.size);
-	if (vaddr == MAP_FAILED)
-		return -1;
+	if (!memcmp(model_str, BSC9132_MODEL_STR, bytes)) {
+		MMAP(priv->het_sys_map.dsp_core1_m2.phys_addr,
+			priv->het_sys_map.dsp_core1_m2.size);
+		if (vaddr == MAP_FAILED)
+			return -1;
 
-	MMAP(priv->het_sys_map.dsp_m3.phys_addr,
-		priv->het_sys_map.dsp_m3.size);
-	if (vaddr == MAP_FAILED)
-		return -1;
+		MMAP(priv->het_sys_map.dsp_m3.phys_addr,
+			priv->het_sys_map.dsp_m3.size);
+		if (vaddr == MAP_FAILED)
+			return -1;
+	}
 end:
 	EXIT(ret);
 	return ret;
