@@ -1,8 +1,7 @@
 /*
  * @fsl_usmmgr.h
  *
- * Copyright (c) 2011
- *  Freescale Semiconductor Inc.  All rights reserved.
+ * Copyright (c) 2011-2012 Freescale Semiconductor Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -186,6 +185,21 @@ int get_dsp_ccsr_area(range_t *r, fsl_usmmgr_t usmmgr);
  *	ERR_SUCCESS as pass, non zero value as failure
 *****************************************************************************/
 int get_shared_ctrl_area(range_t *r, fsl_usmmgr_t usmmgr);
+
+/***************************************************************************
+ * @fsl_usmmgr_dump_memory
+ *
+ * Dump memory contents at specified location.
+ *
+ * mem_dump_buf[in] - virtual address of buffer where memory contents
+ * Needs to be dumped.
+ *
+ * size[in] - Maximum size of the memory contents that needs to be dumped
+ *
+ * Return - On success, number of bytes dumped into mem_dump_buf
+ *          On Failure, less than zero is returned.
+ * ************************************************************************/
+int fsl_usmmgr_dump_memory(void *, size_t);
 
 
 #endif
