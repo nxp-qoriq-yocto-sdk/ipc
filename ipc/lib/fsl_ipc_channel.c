@@ -161,15 +161,20 @@ int fsl_ipc_configure_channel(uint32_t channel_id, uint32_t depth,
 	ipc_priv = (ipc_userspace_t *) ipc;
 
 	ch = get_channel_vaddr(channel_id, ipc_priv);
-	if (ch->consumer_initialized == OS_HET_INITIALIZED)
-		return ret;
+	if (ch->consumer_initialized != OS_HET_INITIALIZED) {
+		if (ch->bd_ring_size <= ipc_priv->max_depth)
+			ch->bd_ring_size = depth;
+		else {
+			ret = -ERR_INVALID_DEPTH;
+			EXIT(ret);
+			goto end;
+		}
+		ch->ch_type = channel_type;
+		if (channel_type == IPC_MSG_CH)
+			ipc_channel_attach_msg_ring(channel_id, msg_ring_paddr,
+				msg_size, ipc_priv);
 
-	if (ch->bd_ring_size <= ipc_priv->max_depth)
-		ch->bd_ring_size = depth;
-	else {
-		ret = -ERR_INVALID_DEPTH;
-		EXIT(ret);
-		goto end;
+		ch->ipc_ind = OS_HET_NO_INT;
 	}
 
 	debug_print("/* allocate ipc_channel_us_t */\n");
@@ -182,61 +187,12 @@ int fsl_ipc_configure_channel(uint32_t channel_id, uint32_t depth,
 		goto end;
 	}
 
-	ch->ch_type = channel_type;
-	if (channel_type == IPC_MSG_CH)
-		ipc_channel_attach_msg_ring(channel_id, msg_ring_paddr,
-					    msg_size, ipc_priv);
-
-	if (cbfunc) {
-		/* find a free rt signal */
-		signal = ipc_get_free_rt_signal();
-		if (!signal) {
-			debug_print("No Free signal found!!! signal=%d\n",
-				signal);
-			ret = -ERR_NO_SIGNAL_FOUND;
-			free(uch);
-			EXIT(ret);
-			goto end;
-		}
-		/*
-		 * call the kernel mode handler to register the irq
-		 * the ipc kernel driver finds a way for DSP to interrupt
-		 * the PA, either using MSG or MSI interrupt.
-		 */
-		sig_action.sa_sigaction = signal_handler;
-		sig_action.sa_flags = SA_SIGINFO;
-		ret = sigaction(signal, &sig_action, NULL);
-		if (ret) {
-			debug_print("Error %d while registering signal handler"
-				    " for signal %d\n", errno, signal);
-			free(uch);
-			EXIT(ret);
-			goto end;
-		}
-
-		rc.channel_id = channel_id;
-		rc.signal = signal;
-
-		ret = ioctl(ipc_priv->dev_het_ipc, IOCTL_IPC_REGISTER_SIGNAL,
-				&rc);
-		if (!ret) {
-			ret = -ERR_IOCTL_FAIL;
-			free(uch);
-			EXIT(ret);
-			goto end;
-		}
-	} else
-		ch->ipc_ind = OS_HET_NO_INT;
-
 	debug_print("/* attach the channel to the list */\n");
 	ipc_priv->channels[ipc_priv->num_channels++] = uch;
 
 	debug_print("/* fill the channel structure */");
-	uch->cbfunc = cbfunc;
-	uch->signal = signal;
 	uch->channel_id = channel_id;
 	ch->consumer_initialized = OS_HET_INITIALIZED;
-
 end:
 	EXIT(ret);
 	return ret;
