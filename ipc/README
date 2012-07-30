@@ -22,10 +22,10 @@ Compilation Procedure
 1. Set KERNEL_DIR as the path of linux soruce code
 2. Set CROSS_COMPILE as the <path of toolchain>/.../powerpc-linux-gnu-
 3. run make
-4. libipc.so, libmem.so, ipc_test, ipc_test67 - gets created under ipc
-                                                directory,
-                                       dsp_bt - gets created under
-                                                dsp_boot directory
+4. libipc.so, libmem.so, ipc_test,
+	      ipc_test67, dump_mem - gets created under ipc directory ,
+			    dsp_bt - gets created under
+				     dsp_boot directory
 
 bootargs Required
 -----------------
@@ -77,3 +77,31 @@ $./ipc_test
 
 For Channel 6-7
 $./ipc_test67
+
+
+Memory Dump
+-----------
+
+dump_mem demo application can be found out in /ipc directory in the rootfile
+system.
+It can dump the Memory contents of address range to a location specified by
+the application.
+
+Requirements:
+1. mem_dump_cfg.txt- Memory areas that needs to be dumped are specified in this    file. Each memory area needs to be specified in terms of start address and      size. Multiple discontiguous memory areas can be specified like following:
+   0x37000000 0x100
+   0x38000000 0x200
+2. The address and size should be in hexadecimal format.
+3. The start addresses needs to be page aligned.
+
+Steps to Run:
+1. cd /ipc
+2. Run ./dump_mem
+3. The output log is generated in the file named Memory_dumped.txt
+4. cat Memory_dumped.txt
+dump_memory_dsp status is (768) 0x300
+
+  fedcba98  fedcba98  00004000  10000000
+  0f000000  1f000000  01000000  3700002c
+  00000000  37000038  37000050  00000040
+  00000010  370000e8  b0022d64  00000960
