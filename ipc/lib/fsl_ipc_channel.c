@@ -150,10 +150,7 @@ int fsl_ipc_configure_channel(uint32_t channel_id, uint32_t depth,
 			ipc_cbfunc_t cbfunc, fsl_ipc_t ipc)
 {
 	int 				ret = ERR_SUCCESS;
-	uint32_t			signal = 0;
-	ipc_rc_t			rc;
 	ipc_channel_us_t		*uch;
-	struct sigaction 		sig_action;
 	os_het_ipc_channel_t 		*ch;
 	ipc_userspace_t			*ipc_priv;
 
