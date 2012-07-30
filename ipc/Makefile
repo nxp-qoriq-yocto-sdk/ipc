@@ -21,5 +21,5 @@ ipc_test:
 	$(CC) ./test/fsl_dump_memory.c $(CFLAGS) -L. -lipc -lmem -o dump_mem
 
 clean:
-	rm -rf ipc_test ipc_test67 ./lib/*.o *.a *.so
+	rm -rf dump_mem ipc_test ipc_test67 ./lib/*.o *.a *.so
 
