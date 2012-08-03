@@ -42,7 +42,8 @@
 #define TLB1_SH_MEM_SIZE	0x1000000
 #define MAX_MAP_NUM		16
 #define STATUS_FAIL		-1
-#define STATUS_FILE_EMPTY 	-2
+#define STATUS_FILE_EMPTY	-2
+#define FILE_NOT_FOUND		-3
 #define MEM_DUMP_CFG_FILE	"mem_dump_cfg.txt"
 
 typedef struct {
@@ -487,9 +488,10 @@ static int get_phy_addr_from_file(unsigned long *buf_in)
 	int i = 0, num_of_entry_in_buf_in = 0;
 	file_d = fopen(MEM_DUMP_CFG_FILE, "r");
 	if (file_d == NULL) {
-		printf("%s does not exist\n", MEM_DUMP_CFG_FILE);
-		exit(-1);
+		perror(MEM_DUMP_CFG_FILE);
+		return FILE_NOT_FOUND;
 	}
+
 	while (!feof(file_d)) {
 
 		if (EOF != fscanf(file_d, "%lx", &buf_in[i])) {
@@ -500,6 +502,7 @@ static int get_phy_addr_from_file(unsigned long *buf_in)
 		}
 
 	}
+
 	fclose(file_d);
 	return num_of_entry_in_buf_in;
 }
@@ -512,16 +515,18 @@ int fsl_usmmgr_dump_memory(void *mem_dump_buf, size_t size)
 	unsigned long calculated_total_size = 0, mmap_size = 0;
 	unsigned int size_left = size;
 	unsigned long current_addr, buf_in[500];
-	int count, file_empty_status;
+	int count, status;
 	int destination_buf_full_flag = 0;
 
-	file_empty_status = get_phy_addr_from_file(buf_in);
+	status = get_phy_addr_from_file(buf_in);
 
-	if (0 == file_empty_status) {
+	if (0 == status) {
 		printf("%s was empty\n", MEM_DUMP_CFG_FILE);
 		return STATUS_FILE_EMPTY;
-	} else
-		count = file_empty_status;
+	} else if (FILE_NOT_FOUND == status)
+		return FILE_NOT_FOUND;
+	else
+		count = status;
 
 	fd = open("/dev/mem", O_RDWR);
 	if (fd < 0) {
