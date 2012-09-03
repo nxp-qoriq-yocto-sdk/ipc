@@ -161,6 +161,10 @@ int fsl_uspace_dma_add_entry(phys_addr_t src, phys_addr_t dest, uint32_t length,
 		return -ERR_DMA_LIST_FULL;
 	}
 
+	dma_priv->dma_list[i].sattr = DMA_ATTR;
+	dma_priv->dma_list[i].dattr = DMA_ATTR;
+	dma_priv->dma_list[i].enlndar = 0;
+	dma_priv->dma_list[i].reserved = 0;
 	dma_priv->dma_list[i].src = src;
 	dma_priv->dma_list[i].dest = dest;
 	dma_priv->dma_list[i].length = length;
@@ -241,18 +245,10 @@ int fsl_uspace_dma_start(fsl_udma_t udma)
 
 void fsl_uspace_dma_list_clear(fsl_udma_t udma)
 {
-	int i = 0;
 	ENTER();
+
 	uspace_dma_t *dma_priv = (uspace_dma_t *)udma;
-
 	dma_priv->list_index = 0;
-	memset(&dma_priv->dma_list[0], 0,
-	       (sizeof(dma_list_t) * MAX_DMA_ENTRIES));
 
-	for (i = 0; i < MAX_DMA_ENTRIES; i++) {
-		dma_priv->dma_list[i].sattr = DMA_ATTR;
-		dma_priv->dma_list[i].dattr = DMA_ATTR;
-		dma_priv->dma_list[i].enlndar = 0;
-	}
 	EXIT(0);
 }
