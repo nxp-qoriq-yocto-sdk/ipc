@@ -28,6 +28,7 @@
 #define LOCAL_PRODUCER_NUM pa_reserved[0]
 #define LOCAL_CONSUMER_NUM pa_reserved[1]
 
+range_t chvpaddr_arr[64];
 /*********** Defines ******************/
 #define MAX_MSG_SIZE 1020
 #define PAGE_SIZE 4096
@@ -40,8 +41,14 @@
 
 int init_het_ipc(ipc_userspace_t *ipc);
 uint32_t ipc_get_free_rt_signal(void);
-void *get_channel_vaddr(uint32_t channel_id, ipc_userspace_t *ipc_priv);
-phys_addr_t get_channel_paddr(uint32_t channel_id, ipc_userspace_t *ipc_priv);
+static void *get_channel_vaddr(uint32_t channel_id,
+					ipc_userspace_t *ipc_priv);
+static void *__get_channel_vaddr(uint32_t channel_id,
+					ipc_userspace_t *ipc_priv);
+static phys_addr_t get_channel_paddr(uint32_t channel_id,
+					ipc_userspace_t *ipc_priv);
+static phys_addr_t __get_channel_paddr(uint32_t channel_id,
+					ipc_userspace_t *ipc_priv);
 int get_channels_info(ipc_userspace_t *ipc);
 void generate_indication(os_het_ipc_channel_t *ipc_ch,
 			ipc_userspace_t *ipc_priv);
@@ -53,7 +60,7 @@ fsl_ipc_t fsl_ipc_init(ipc_p2v_t p2vcb, range_t sh_ctrl_area,
 {
 	int ret = ERR_SUCCESS;
 	ipc_userspace_t *ipc_priv = NULL;
-
+	int i;
 	ENTER();
 
 	if (!p2vcb) {
@@ -84,6 +91,10 @@ fsl_ipc_t fsl_ipc_init(ipc_p2v_t p2vcb, range_t sh_ctrl_area,
 	if (ret)
 		goto end;
 
+	for (i = 0; i < MAX_IPC_CHANNELS; i++) {
+		chvpaddr_arr[i].phys_addr = __get_channel_paddr(i, ipc_priv);
+		chvpaddr_arr[i].vaddr = __get_channel_vaddr(i, ipc_priv);
+	}
 end:
 	EXIT(ret);
 	if (ret) /* if ret non zero free ipc_priv */
@@ -280,7 +291,6 @@ int fsl_ipc_send_tx_req(uint32_t channel_id, sg_list_t *sgl,
 		EXIT(-ERR_CHANNEL_FULL);
 		return -ERR_CHANNEL_FULL;
 	}
-
 	fsl_uspace_dma_list_clear(ipc_priv->udma);
 
 	/* copy txreq */
@@ -837,7 +847,8 @@ end:
  *
  * Type: Internal function
  */
-phys_addr_t get_channel_paddr(uint32_t channel_id, ipc_userspace_t *ipc_priv)
+static phys_addr_t __get_channel_paddr(uint32_t channel_id,
+					ipc_userspace_t *ipc_priv)
 {
 	phys_addr_t		phys_addr;
 
@@ -859,7 +870,8 @@ phys_addr_t get_channel_paddr(uint32_t channel_id, ipc_userspace_t *ipc_priv)
  *
  * Type: Internal function
  */
-void *get_channel_vaddr(uint32_t channel_id, ipc_userspace_t *ipc_priv)
+static void *__get_channel_vaddr(uint32_t channel_id,
+					ipc_userspace_t *ipc_priv)
 {
 	void *vaddr;
 	ENTER();
@@ -868,6 +880,32 @@ void *get_channel_vaddr(uint32_t channel_id, ipc_userspace_t *ipc_priv)
 
 	EXIT(vaddr);
 	return vaddr;
+}
+/*
+ * @get_channel_paddr
+ *
+ * Returns the phyical address of the channel data structure in the
+ * share control area.
+ *
+ * Type: Internal function
+ */
+static phys_addr_t get_channel_paddr(uint32_t channel_id,
+					ipc_userspace_t *ipc_priv)
+{
+	return chvpaddr_arr[channel_id].phys_addr;
+}
+
+/*
+ * @get_channel_vaddr
+ *
+ * Returns the virtual address of the channel data structure in the
+ * share control area.
+ *
+ * Type: Internal function
+ */
+static void *get_channel_vaddr(uint32_t channel_id, ipc_userspace_t *ipc_priv)
+{
+	return chvpaddr_arr[channel_id].vaddr;
 }
 /*
  * @init_het_ipc
@@ -887,3 +925,4 @@ int init_het_ipc(ipc_userspace_t *ipc_priv)
 	EXIT(ret);
 	return ret;
 }
+
