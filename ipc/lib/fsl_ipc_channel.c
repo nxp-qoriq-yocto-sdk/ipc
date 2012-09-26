@@ -19,6 +19,7 @@
 #include "fsl_user_dma.h"
 #include "fsl_ipc_um.h"
 #include "fsl_usmmgr.h"
+#include "fsl_ipc_lock.h"
 #include "fsl_ipc_kmod.h"
 #include "fsl_bsc913x_ipc.h"
 #include "fsl_ipc_errorcodes.h"
@@ -28,7 +29,9 @@
 #define LOCAL_PRODUCER_NUM pa_reserved[0]
 #define LOCAL_CONSUMER_NUM pa_reserved[1]
 
-range_t chvpaddr_arr[64];
+range_t chvpaddr_arr[MAX_IPC_CHANNELS];
+int ch_semid[MAX_IPC_CHANNELS];
+
 /*********** Defines ******************/
 #define MAX_MSG_SIZE 1020
 #define PAGE_SIZE 4096
@@ -95,6 +98,11 @@ fsl_ipc_t fsl_ipc_init(ipc_p2v_t p2vcb, range_t sh_ctrl_area,
 		chvpaddr_arr[i].phys_addr = __get_channel_paddr(i, ipc_priv);
 		chvpaddr_arr[i].vaddr = __get_channel_vaddr(i, ipc_priv);
 	}
+
+#ifdef CONFIG_LOCK
+	for (i = 0; i < MAX_IPC_CHANNELS; i++)
+		ch_semid[i] = fsl_ipc_init_lock(chvpaddr_arr[i].phys_addr);
+#endif
 end:
 	EXIT(ret);
 	if (ret) /* if ret non zero free ipc_priv */
@@ -116,6 +124,11 @@ void fsl_ipc_exit(fsl_ipc_t ipc)
 	/* close het_ipc */
 	close(ipc_priv->dev_het_ipc);
 
+#ifdef CONFIG_LOCK
+	for (i = 0; i < MAX_IPC_CHANNELS; i++)
+		fsl_ipc_destroy_lock(ch_semid[i]);
+#endif
+
 	/* free memory */
 	for (i = 0; i < ipc_priv->num_channels; i++)
 		free(ipc_priv->channels[i]);
@@ -130,12 +143,13 @@ void fsl_ipc_exit(fsl_ipc_t ipc)
  * This function attaches the ptr's to the msg buffers to the pointer ring.
  *
  * Type: Internal
+ * It is assumed that the lock is taken by the caller.
  */
 int ipc_channel_attach_msg_ring(uint32_t channel_id, phys_addr_t msg_phys_addr,
 				uint32_t msg_size, ipc_userspace_t *ipc_priv)
 {
 	int depth;
-	int err = ERR_SUCCESS;
+	int ret = ERR_SUCCESS;
 	int i = 0;
 
 	os_het_ipc_channel_t 	*ch;
@@ -152,7 +166,7 @@ int ipc_channel_attach_msg_ring(uint32_t channel_id, phys_addr_t msg_phys_addr,
 		msg_phys_addr += msg_size;
 	}
 
-	return err;
+	return ret;
 }
 
 int fsl_ipc_configure_channel(uint32_t channel_id, uint32_t depth,
@@ -164,11 +178,20 @@ int fsl_ipc_configure_channel(uint32_t channel_id, uint32_t depth,
 	ipc_channel_us_t		*uch;
 	os_het_ipc_channel_t 		*ch;
 	ipc_userspace_t			*ipc_priv;
+	int locked = 0;
 
 	ENTER();
 	ipc_priv = (ipc_userspace_t *) ipc;
 
 	ch = get_channel_vaddr(channel_id, ipc_priv);
+
+	ret = fsl_ipc_lock(ch_semid[channel_id]);
+	if (ret < 0) {
+		EXIT(ret);
+		goto end;
+	}
+	locked = 1;
+
 	if (ch->consumer_initialized != OS_HET_INITIALIZED) {
 		if (ch->bd_ring_size <= ipc_priv->max_depth)
 			ch->bd_ring_size = depth;
@@ -202,6 +225,9 @@ int fsl_ipc_configure_channel(uint32_t channel_id, uint32_t depth,
 	uch->channel_id = channel_id;
 	ch->consumer_initialized = OS_HET_INITIALIZED;
 end:
+	if (locked)
+		fsl_ipc_unlock(ch_semid[channel_id]);
+
 	EXIT(ret);
 	return ret;
 }
@@ -210,24 +236,36 @@ int fsl_ipc_configure_txreq(uint32_t channel_id, phys_addr_t phys_addr,
 			uint32_t max_txreq_lbuff_size, fsl_ipc_t ipc)
 {
 	int ret;
+	int locked = 0;
 	phys_addr_t phys_addr_s;
 	range_t dma_list_mem;
-	ret = ERR_SUCCESS;
 	os_het_ipc_channel_t 	*ipc_ch;
 	ipc_userspace_t		*ipc_priv;
 
 	ENTER();
 
 	ipc_priv = (ipc_userspace_t *) ipc;
-	if (channel_id >= ipc_priv->max_channels)
-		return -ERR_CHANNEL_NOT_FOUND;
+	if (channel_id >= ipc_priv->max_channels) {
+		ret = -ERR_CHANNEL_NOT_FOUND;
+		EXIT(ret);
+		goto end;
+	}
 
 	ipc_ch = get_channel_vaddr(channel_id, ipc_priv);
+
+	ret = fsl_ipc_lock(ch_semid[channel_id]);
+	if (ret < 0) {
+		EXIT(ret);
+		goto end;
+	}
+	locked = 1;
+
 	if (ipc_ch->producer_initialized != OS_HET_INITIALIZED) {
 		printf("Producer must open TxReq channel %d before doing "
 		       "its configuration\n", channel_id);
-		EXIT(0);
-		return -ERR_PRODUCER_NOT_INIT;
+		ret =  -ERR_PRODUCER_NOT_INIT;
+		EXIT(ret);
+		goto end;
 	}
 
 	debug_print("Params %x %x %x \n", channel_id, phys_addr,
@@ -255,6 +293,10 @@ int fsl_ipc_configure_txreq(uint32_t channel_id, phys_addr_t phys_addr,
 
 	ipc_priv->udma = fsl_uspace_dma_init(dma_list_mem, ipc_priv->pa_ccsr);
 
+end:
+	if (locked)
+		fsl_ipc_unlock(ch_semid[channel_id]);
+
 	EXIT(ret);
 	return ret;
 }
@@ -273,24 +315,33 @@ int fsl_ipc_send_tx_req(uint32_t channel_id, sg_list_t *sgl,
 	os_het_ipc_bd_t			*bd;
 	os_het_ipc_channel_t		*ipc_ch;
 	ipc_userspace_t 		*ipc_priv;
-
+	int locked = 0;
 	ENTER();
-
-	ret = ERR_SUCCESS;
 
 	ipc_priv = (ipc_userspace_t *)ipc;
 
 	ipc_ch = get_channel_vaddr(channel_id, ipc_priv);
 	if (ipc_ch->consumer_initialized != OS_HET_INITIALIZED) {
 		debug_print("Error: consumer not initialized\n");
-		return -ERR_CONSUMER_NOT_INIT;
+		ret = -ERR_CONSUMER_NOT_INIT;
+		EXIT(ret);
+		goto end;
 	}
+
+	ret = fsl_ipc_lock(ch_semid[channel_id]);
+	if (ret < 0) {
+		EXIT(ret);
+		goto end;
+	}
+	locked = 1;
 
 	/* check if the channel is full */
 	if (OS_HET_CH_FULL(ipc_ch)) {
-		EXIT(-ERR_CHANNEL_FULL);
-		return -ERR_CHANNEL_FULL;
+		ret = -ERR_CHANNEL_FULL;
+		EXIT(ret);
+		goto end;
 	}
+
 	fsl_uspace_dma_list_clear(ipc_priv->udma);
 
 	/* copy txreq */
@@ -302,8 +353,9 @@ int fsl_ipc_send_tx_req(uint32_t channel_id, sg_list_t *sgl,
 	bd->msg_len = tx_req_len;
 	vaddr = (*ipc_priv->p2vcb)(phys_addr);
 	if (!vaddr) {
-		EXIT(-1);
-		return -1;
+		ret = -1;
+		EXIT(ret);
+		goto end;
 	}
 
 	debug_print("copying %x to %x length %x\n",
@@ -388,6 +440,10 @@ int fsl_ipc_send_tx_req(uint32_t channel_id, sg_list_t *sgl,
 	fsl_uspace_dma_start(ipc_priv->udma);
 	ipc_priv->txreq_inprocess = 1;
 
+end:
+	if (locked)
+		fsl_ipc_unlock(ch_semid[channel_id]);
+
 	EXIT(ret);
 	return ret;
 }
@@ -418,20 +474,32 @@ int fsl_ipc_set_consumed_status(uint32_t channel_id, fsl_ipc_t ipc)
 {
 	os_het_ipc_channel_t	*ipc_ch;
 	ipc_userspace_t		*ipc_priv;
-
+	int locked = 0;
+	int ret = ERR_SUCCESS;
 	ENTER();
 
 	ipc_priv = (ipc_userspace_t *)ipc;
 
 	ipc_ch = get_channel_vaddr(channel_id, ipc_priv);
 
+	ret = fsl_ipc_lock(ch_semid[channel_id]);
+	if (ret < 0) {
+		EXIT(ret);
+		goto end;
+	}
+	locked = 1;
+
 	if (!OS_HET_CH_EMPTY(ipc_ch)) {
 		OS_HET_INCREMENT_CONSUMER(ipc_ch);
 		ipc_ch->LOCAL_CONSUMER_NUM = (ipc_ch->LOCAL_CONSUMER_NUM +
 						1) % ipc_ch->bd_ring_size;
 	}
-	EXIT(0);
-	return ERR_SUCCESS;
+
+end:
+	if (locked)
+		fsl_ipc_unlock(ch_semid[channel_id]);
+
+	return ret;
 }
 
 int fsl_ipc_chk_recv_status(uint64_t *bmask, fsl_ipc_t ipc)
@@ -478,7 +546,8 @@ int fsl_ipc_send_ptr(uint32_t channel_id, phys_addr_t addr, uint32_t len,
 	os_het_ipc_bd_t	*bd;
 	os_het_ipc_channel_t	*ipc_ch;
 	ipc_userspace_t 		*ipc_priv;
-
+	int ret = ERR_SUCCESS;
+	int locked = 0;
 	ENTER();
 
 	ipc_priv = (ipc_userspace_t *)ipc;
@@ -488,12 +557,25 @@ int fsl_ipc_send_ptr(uint32_t channel_id, phys_addr_t addr, uint32_t len,
 	/* check if the channel is init by the consumer */
 	if (ipc_ch->consumer_initialized != OS_HET_INITIALIZED) {
 		debug_print("Error: consumer not initialized\n");
-		return -ERR_CONSUMER_NOT_INIT;
+		ret = -ERR_CONSUMER_NOT_INIT;
+		EXIT(ret);
+		goto end;
 	}
 
+	ret = fsl_ipc_lock(ch_semid[channel_id]);
+	if (ret < 0) {
+		EXIT(ret);
+		goto end;
+	}
+	locked = 1;
+
 	/* check if the channel is full */
-	if (OS_HET_CH_FULL(ipc_ch))
-		return -ERR_CHANNEL_FULL;
+	if (OS_HET_CH_FULL(ipc_ch)) {
+		ret = -ERR_CHANNEL_FULL;
+		EXIT(ret);
+		goto end;
+	}
+
 
 	/* virtual address of the bd_ring pointed to by bd_base(phys_addr) */
 	bd_base = SH_CTRL_VADDR(ipc_ch->bd_base);
@@ -510,7 +592,11 @@ int fsl_ipc_send_ptr(uint32_t channel_id, phys_addr_t addr, uint32_t len,
 		generate_indication(ipc_ch, ipc_priv);
 	}
 
-	return 0;
+end:
+	if (locked)
+		fsl_ipc_unlock(ch_semid[channel_id]);
+
+	return ret;
 }
 
 void dump_ipc_channel(os_het_ipc_channel_t *ipc_ch)
@@ -555,6 +641,8 @@ int fsl_ipc_send_msg(uint32_t channel_id, void *src_buf_addr, uint32_t len,
 			fsl_ipc_t ipc)
 {
 	void *vaddr;
+	int ret = ERR_SUCCESS;
+	int locked = 0;
 	os_het_ipc_bd_t	*bd_base;
 	os_het_ipc_bd_t	*bd;
 	os_het_ipc_channel_t	*ipc_ch;
@@ -570,20 +658,30 @@ int fsl_ipc_send_msg(uint32_t channel_id, void *src_buf_addr, uint32_t len,
 	/* check if the channel is init by the consumer */
 	if (ipc_ch->consumer_initialized != OS_HET_INITIALIZED) {
 		debug_print("Error: consumer not initialized\n");
-		EXIT(-1);
-		return -ERR_CONSUMER_NOT_INIT;
+		ret = -ERR_CONSUMER_NOT_INIT;
+		EXIT(ret);
+		goto end;
 	}
 	debug_print("\n num free bds = %d \n", OS_HET_CH_FREE_BDS(ipc_ch));
 
+	ret = fsl_ipc_lock(ch_semid[channel_id]);
+	if (ret < 0) {
+		EXIT(ret);
+		goto end;
+	}
+	locked = 1;
+
 	/* check if the channel is full */
 	if (OS_HET_CH_FULL(ipc_ch)) {
-		EXIT(-ERR_CHANNEL_FULL);
-		return -ERR_CHANNEL_FULL;
+		ret = -ERR_CHANNEL_FULL;
+		EXIT(ret);
+		goto end;
 	}
 
 	/* virtual address of the bd_ring pointed to by bd_base(phys_addr) */
 	bd_base = SH_CTRL_VADDR(ipc_ch->bd_base);
 	debug_print("V= %x P=%x \n", ipc_ch->bd_base, bd_base);
+
 
 	/*OLD bd = &bd_base[ipc_ch->tracker.producer_num];*/
 	bd = &bd_base[ipc_ch->LOCAL_PRODUCER_NUM];
@@ -593,8 +691,9 @@ int fsl_ipc_send_msg(uint32_t channel_id, void *src_buf_addr, uint32_t len,
 	/* get the virtual address of the msg ring */
 	vaddr =  (*ipc_priv->p2vcb)(bd->msg_ptr);
 	if (!vaddr) {
-		EXIT(-1);
-		return -1;
+		ret = -1;
+		EXIT(ret);
+		goto end;
 	}
 	debug_print("Address of msg P=%x V= %x\n",
 			bd->msg_ptr, (uint32_t)vaddr);
@@ -609,34 +708,51 @@ int fsl_ipc_send_msg(uint32_t channel_id, void *src_buf_addr, uint32_t len,
 		generate_indication(ipc_ch, ipc_priv);
 	}
 
-	EXIT(0);
-	return 0;
+end:
+	if (locked)
+		fsl_ipc_unlock(ch_semid[channel_id]);
+	return ret;
 }
 
 int fsl_ipc_recv_ptr(uint32_t channel_id, phys_addr_t *addr, uint32_t *len,
 			fsl_ipc_t ipc)
 {
+	int ret = ERR_SUCCESS;
 	os_het_ipc_bd_t	*bd_base;
 	os_het_ipc_bd_t	*bd;
 	os_het_ipc_channel_t 	*ipc_ch;
 	ipc_userspace_t 		*ipc_priv;
-
+	int locked = 0;
 	ENTER();
 
 	ipc_priv = (ipc_userspace_t *)ipc;
-	if (channel_id >= ipc_priv->max_channels)
-		return -ERR_CHANNEL_NOT_FOUND;
-
+	if (channel_id >= ipc_priv->max_channels) {
+		ret = -ERR_CHANNEL_NOT_FOUND;
+		EXIT(ret);
+		goto end;
+	}
 	ipc_ch = get_channel_vaddr(channel_id, ipc_priv);
 	if (ipc_ch->producer_initialized != OS_HET_INITIALIZED) {
 		debug_print("Error: producer not initialized\n");
-		return -ERR_PRODUCER_NOT_INIT;
+		ret = -ERR_PRODUCER_NOT_INIT;
+		EXIT(ret);
+		goto end;
+
 	}
 
-	/* check if the channel is full */
-	if (OS_HET_CH_EMPTY(ipc_ch))
-		return -ERR_CHANNEL_EMPTY;
+	ret = fsl_ipc_lock(ch_semid[channel_id]);
+	if (ret < 0) {
+		EXIT(ret);
+		goto end;
+	}
+	locked = 1;
 
+	/* check if the channel is full */
+	if (OS_HET_CH_EMPTY(ipc_ch)) {
+		ret = -ERR_CHANNEL_EMPTY;
+		EXIT(ret);
+		goto end;
+	}
 	bd_base = SH_CTRL_VADDR(ipc_ch->bd_base);
 	/*bd = &bd_base[ipc_ch->tracker.consumer_num]; */
 	bd = &bd_base[ipc_ch->LOCAL_CONSUMER_NUM];
@@ -647,17 +763,24 @@ int fsl_ipc_recv_ptr(uint32_t channel_id, phys_addr_t *addr, uint32_t *len,
 	OS_HET_INCREMENT_CONSUMER(ipc_ch);
 	ipc_ch->LOCAL_CONSUMER_NUM = (ipc_ch->LOCAL_CONSUMER_NUM + 1) %
 					ipc_ch->bd_ring_size;
-	EXIT(0);
-	return 0;
+
+end:
+	if (locked)
+		fsl_ipc_unlock(ch_semid[channel_id]);
+
+	EXIT(ret);
+	return ret;
 }
 
 int fsl_ipc_recv_ptr_hold(uint32_t channel_id, phys_addr_t *addr, uint32_t *len,
 			fsl_ipc_t ipc)
 {
-	 os_het_ipc_bd_t	*bd_base;
-	 os_het_ipc_bd_t	*bd;
-	 os_het_ipc_channel_t 	*ipc_ch;
-	ipc_userspace_t 		*ipc_priv;
+	int ret = ERR_SUCCESS;
+	int locked = 0;
+	os_het_ipc_bd_t	*bd_base;
+	os_het_ipc_bd_t	*bd;
+	os_het_ipc_channel_t 	*ipc_ch;
+	ipc_userspace_t 	*ipc_priv;
 
 	ENTER();
 
@@ -665,9 +788,19 @@ int fsl_ipc_recv_ptr_hold(uint32_t channel_id, phys_addr_t *addr, uint32_t *len,
 
 	ipc_ch = get_channel_vaddr(channel_id, ipc_priv);
 
+	ret = fsl_ipc_lock(ch_semid[channel_id]);
+	if (ret < 0) {
+		EXIT(ret);
+		goto end;
+	}
+	locked = 1;
+
 	/* check if the channel is full */
-	if (OS_HET_CH_EMPTY(ipc_ch))
-		return -ERR_CHANNEL_EMPTY;
+	if (OS_HET_CH_EMPTY(ipc_ch)) {
+		ret =  -ERR_CHANNEL_EMPTY;
+		EXIT(ret);
+		goto end;
+	}
 
 	bd_base = SH_CTRL_VADDR(ipc_ch->bd_base);
 	/*bd = &bd_base[ipc_ch->tracker.consumer_num];*/
@@ -676,17 +809,21 @@ int fsl_ipc_recv_ptr_hold(uint32_t channel_id, phys_addr_t *addr, uint32_t *len,
 	*addr = (phys_addr_t)bd->msg_ptr;
 	*len = bd->msg_len;
 
-	EXIT(0);
-	return 0;
+end:
+	if (locked)
+		fsl_ipc_unlock(ch_semid[channel_id]);
+	return ret;
 }
 
 int fsl_ipc_recv_msg(uint32_t channel_id, void *addr, uint32_t *len,
 		fsl_ipc_t ipc)
 {
-	 os_het_ipc_bd_t	*bd_base;
-	 os_het_ipc_bd_t	*bd;
-	 void			*vaddr;
-	 os_het_ipc_channel_t 	*ipc_ch;
+	int ret = ERR_SUCCESS;
+	int locked = 0;
+	os_het_ipc_bd_t	*bd_base;
+	os_het_ipc_bd_t	*bd;
+	void			*vaddr;
+	os_het_ipc_channel_t 	*ipc_ch;
 	ipc_userspace_t 		*ipc_priv;
 
 	ENTER();
@@ -695,9 +832,19 @@ int fsl_ipc_recv_msg(uint32_t channel_id, void *addr, uint32_t *len,
 
 	ipc_ch = get_channel_vaddr(channel_id, ipc_priv);
 
+	ret = fsl_ipc_lock(ch_semid[channel_id]);
+	if (ret < 0) {
+		EXIT(ret);
+		goto end;
+	}
+	locked = 1;
+
 	/* check if the channel is full */
-	if (OS_HET_CH_EMPTY(ipc_ch))
-		return -ERR_CHANNEL_EMPTY;
+	if (OS_HET_CH_EMPTY(ipc_ch)) {
+		ret = -ERR_CHANNEL_EMPTY;
+		EXIT(ret);
+		goto end;
+	}
 
 	bd_base = SH_CTRL_VADDR(ipc_ch->bd_base);
 	/*bd = &bd_base[ipc_ch->tracker.consumer_num];*/
@@ -712,16 +859,21 @@ int fsl_ipc_recv_msg(uint32_t channel_id, void *addr, uint32_t *len,
 	ipc_ch->LOCAL_CONSUMER_NUM = (ipc_ch->LOCAL_CONSUMER_NUM + 1) %
 					ipc_ch->bd_ring_size;
 
-	return 0;
+end:
+	if (locked)
+		fsl_ipc_unlock(ch_semid[channel_id]);
+	return ret;
 }
 
 int fsl_ipc_recv_msg_ptr(uint32_t channel_id, void **dst_buffer,
 			uint32_t *len, fsl_ipc_t ipc)
 {
-	 os_het_ipc_bd_t		*bd_base;
-	 os_het_ipc_bd_t		*bd;
-	 os_het_ipc_channel_t 		*ipc_ch;
-	ipc_userspace_t 			*ipc_priv;
+	int ret = ERR_SUCCESS;
+	int locked = 0;
+	os_het_ipc_bd_t		*bd_base;
+	os_het_ipc_bd_t		*bd;
+	os_het_ipc_channel_t 	*ipc_ch;
+	ipc_userspace_t 	*ipc_priv;
 
 	ENTER();
 
@@ -729,12 +881,25 @@ int fsl_ipc_recv_msg_ptr(uint32_t channel_id, void **dst_buffer,
 
 	ipc_ch = get_channel_vaddr(channel_id, ipc_priv);
 
-	if (!ipc_ch->producer_initialized)
-		return -ERR_PRODUCER_NOT_INIT;
+	if (!ipc_ch->producer_initialized) {
+		ret = -ERR_PRODUCER_NOT_INIT;
+		EXIT(ret);
+		goto end;
+	}
+
+	ret = fsl_ipc_lock(ch_semid[channel_id]);
+	if (ret < 0) {
+		EXIT(ret);
+		goto end;
+	}
+	locked = 1;
 
 	/* check if the channel is full */
-	if (OS_HET_CH_EMPTY(ipc_ch))
-		return -ERR_CHANNEL_EMPTY;
+	if (OS_HET_CH_EMPTY(ipc_ch)) {
+		ret = -ERR_CHANNEL_EMPTY;
+		EXIT(ret);
+		goto end;
+	}
 
 	bd_base = SH_CTRL_VADDR(ipc_ch->bd_base);
 	/* bd = &bd_base[ipc_ch->tracker.consumer_num]; */
@@ -743,7 +908,10 @@ int fsl_ipc_recv_msg_ptr(uint32_t channel_id, void **dst_buffer,
 	*dst_buffer = (*ipc_priv->p2vcb)(bd->msg_ptr);
 	*len = bd->msg_len;
 
-	return ERR_SUCCESS;
+end:
+	if (locked)
+		fsl_ipc_unlock(ch_semid[channel_id]);
+	return ret;
 }
 /**************** Internal API ************************/
 /*

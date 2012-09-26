@@ -8,7 +8,6 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/shm.h>
-#include <sys/sem.h>
 #include <sys/ioctl.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -22,6 +21,7 @@
 #include "logdefs.h"
 #include "fsl_ipc_errorcodes.h"
 #include "bsc913x_heterogeneous.h"
+#include "fsl_ipc_lock.h"
 
 #define BSC9132_MODEL_STR	"fsl,bsc9132"
 
@@ -58,13 +58,6 @@ typedef struct {
 	range_t dsp_ccsr;
 	range_t pa_ccsr;
 } usmmgr_priv;
-
-union semun {
-	int val;
-	struct semid_ds *buf;
-	unsigned short  *array;
-	struct seminfo  *__buf;
-};
 
 void cleanup(usmmgr_priv *priv);
 /* */
@@ -207,34 +200,14 @@ static int fsl_usmmgr_sem_lock()
 {
 	int rc = 0;
 	int semid;
-	key_t key = getpid();
-	int semflg = IPC_CREAT | 0666;
-	int nsems = 1, nsops = 2;
-	struct sembuf sops[2];
 
-	semid = semget(key, nsems, semflg);
+	semid = fsl_ipc_sem_init(getpid());
 	if (semid < 0) {
-		perror("semget: semget failed");
+		printf("%s: Error in initializing semaphore\n", __func__);
 		rc = -1;
-		goto end;
-	} else {
-		sops[0].sem_num = 0;
-		sops[0].sem_op = 0;
-		sops[0].sem_flg = SEM_UNDO;
+	} else
+		rc = fsl_ipc_sem_lock(semid);
 
-		sops[1].sem_num = 0;
-		sops[1].sem_op = 1;
-		sops[1].sem_flg = SEM_UNDO | IPC_NOWAIT;
-
-		rc = semop(semid, sops, nsops);
-		if (rc < 0) {
-			perror("semop: semop failed");
-			rc = -1;
-			goto end;
-		}
-	}
-
-end:
 	return rc;
 }
 
@@ -242,30 +215,14 @@ static int fsl_usmmgr_sem_unlock()
 {
 	int rc = 0;
 	int semid;
-	key_t key = getpid();
-	int semflg = IPC_CREAT | 0666;
-	int nsems = 1, nsops = 1;
-	struct sembuf sops;
 
-	semid = semget(key, nsems, semflg);
+	semid = fsl_ipc_sem_init(getpid());
 	if (semid < 0) {
-		perror("semget: semget failed");
+		printf("%s: Error in initializing semaphore\n", __func__);
 		rc = -1;
-		goto end;
-	} else {
-		sops.sem_num = 0;
-		sops.sem_op = -1;
-		sops.sem_flg = SEM_UNDO | IPC_NOWAIT;
+	} else
+		rc = fsl_ipc_sem_unlock(semid);
 
-		rc = semop(semid, &sops, nsops);
-		if (rc < 0) {
-			perror("semop: semop failed");
-			rc = -1;
-			goto end;
-		}
-	}
-
-end:
 	return rc;
 }
 
@@ -273,7 +230,6 @@ static int fsl_usmmgr_sem_destroy()
 {
 	key_t key = getpid();
 	int semid;
-	union semun arg;
 	int rc = 0;
 
 	semid = semget(key, 1, 0);
@@ -284,12 +240,10 @@ static int fsl_usmmgr_sem_destroy()
 		goto out;
 	}
 
-	if (semctl(semid, 0, IPC_RMID, arg) == -1) {
-		perror("Unable to destroy fsl_usmmgr semaphore\r\n");
-		rc = -1;
-		goto out;
-	}
-
+	rc = fsl_ipc_sem_destroy(semid);
+	if (rc < 0)
+		printf("%s: Unable to destroy semid %d semaphore\r\n",
+			__func__, semid);
 out:
 	return rc;
 }
