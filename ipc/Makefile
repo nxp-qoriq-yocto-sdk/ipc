@@ -17,7 +17,8 @@ ipc_lib:
 
 mem_lib:
 	$(CC) -c ./lib/fsl_usmmgr.c $(CFLAGS) -o ./lib/fsl_usmmgr.o
-	$(CC) -shared -fPIC ./lib/fsl_usmmgr.o -L../fsl_shm -llg_shm  -o libmem.so
+	$(CC) -c ./lib/fsl_ipc_lock.c $(CFLAGS) -o ./lib/fsl_ipc_lock.o
+	$(CC) -shared -fPIC ./lib/fsl_usmmgr.o ./lib/fsl_ipc_lock.o -L../fsl_shm -llg_shm  -o libmem.so
 #	$(AR) rcs libmem.a ./lib/fsl_usmmgr.o
 
 ipc_test:
