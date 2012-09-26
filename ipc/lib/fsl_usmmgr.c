@@ -44,7 +44,9 @@
 #define STATUS_FAIL		-1
 #define STATUS_FILE_EMPTY	-2
 #define FILE_NOT_FOUND		-3
+#define MMAP_FAILED		-4
 #define MEM_DUMP_CFG_FILE	"mem_dump_cfg.txt"
+#define PAGE_SIZE 		0x1000
 
 typedef struct {
 	int mapidx;
@@ -466,9 +468,9 @@ int fsl_usmmgr_dump_memory(void *mem_dump_buf, size_t size)
 
 	int fd, i = 0;
 	void *base;
-	unsigned long calculated_total_size = 0, mmap_size = 0;
+	unsigned long calculated_total_size = 0, mmap_size = 0, pad_len = 0;
 	unsigned int size_left = size;
-	unsigned long current_addr, buf_in[500];
+	unsigned long current_addr, buf_in[500], mmap_addr_aligned;
 	int count, status;
 	int destination_buf_full_flag = 0;
 
@@ -491,10 +493,20 @@ int fsl_usmmgr_dump_memory(void *mem_dump_buf, size_t size)
 	current_addr = (unsigned long)mem_dump_buf;
 	for (i = 0; i < count; i++) {
 
+		pad_len = buf_in[i*2] % PAGE_SIZE;
+
+		if (pad_len)
+			mmap_addr_aligned = buf_in[i*2] - pad_len;
+		else
+			mmap_addr_aligned = buf_in[i*2];
+
 		mmap_size = buf_in[(i*2)+1];
 		calculated_total_size += mmap_size;
-		printf("physical_address=0x%lx  size=0x%lx\n",
-			buf_in[(i*2)], mmap_size);
+
+		printf("physical_address=0x%lx  size=0x%lx"
+			" mmap_addr_aligned=0x%lx pad_len=0x%lx\n",
+			buf_in[(i*2)], mmap_size, mmap_addr_aligned, pad_len);
+
 		if (mmap_size == 0)
 			continue;
 
@@ -505,10 +517,16 @@ int fsl_usmmgr_dump_memory(void *mem_dump_buf, size_t size)
 			destination_buf_full_flag = 1;
 		}
 
-		if (mmap_size != 0)
-			base = mmap(0, mmap_size, PROT_READ|PROT_WRITE,
-				MAP_SHARED, fd, buf_in[(i*2)]);
-		else {
+		if (mmap_size != 0) {
+			base = mmap(0, (mmap_size + pad_len),
+				PROT_READ|PROT_WRITE, MAP_SHARED,
+				fd, mmap_addr_aligned);
+			if (base == MAP_FAILED) {
+				perror("mmap failed");
+				close(fd);
+				return MMAP_FAILED;
+			}
+		 } else {
 			close(fd);
 			return size;
 		}
@@ -518,14 +536,15 @@ int fsl_usmmgr_dump_memory(void *mem_dump_buf, size_t size)
 				printf("mmap failed\n");
 				return STATUS_FAIL;
 		} else {
-				memcpy((void *)current_addr, base, mmap_size);
+				memcpy((void *)current_addr, (base + pad_len),
+					mmap_size);
 				if (destination_buf_full_flag == 1) {
 					calculated_total_size = size;
-					munmap(base, mmap_size);
+					munmap(base, (mmap_size + pad_len));
 					break;
 				}
 				current_addr += mmap_size;
-				munmap(base, mmap_size);
+				munmap(base, (mmap_size + pad_len));
 		}
 	}
 

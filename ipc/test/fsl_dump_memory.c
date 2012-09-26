@@ -10,24 +10,40 @@
 #include <unistd.h>
 #include "fsl_usmmgr.h"
 
-#define SIZE 0x4000
+#define OUTPUT_TEXT_FILE	"Memory_dumped.txt"
+#define OUTPUT_BINARY_TXT	"Memory_dumped.dat"
 
-int main()
+int main(int arg_c, char *argv[])
 {
+	if (arg_c != 2) {
+		printf("Usage:\"./dump_mem <des_buf_size>\"\n");
+		printf("des_buf_size is the Max size of destination buffer\n");
+		exit(-1);
+	}
+
 	int i, status = 0;
-	void *d_buf = malloc(400000);
+	int size = atoll(argv[1]);
+	printf("size = %d\n", size);
+
+	void *d_buf = malloc(size);
 	if (d_buf == NULL) {
 		printf("malloc fail\n");
+		printf("Use des_buf_size less than %d \n", size);
 		exit(-1);
 	}
 
-	FILE *fd = fopen("Memory_dumped.txt", "w");
+	FILE *fd = fopen(OUTPUT_TEXT_FILE, "w");
 	if (fd == NULL) {
-		printf("dumped_memory.txt open fail\n");
+		printf("%s open fail\n", OUTPUT_TEXT_FILE);
+		exit(-1);
+	}
+	FILE *fd_b = fopen(OUTPUT_BINARY_TXT, "wb");
+	if (fd == NULL) {
+		printf("%s  open fail\n", OUTPUT_BINARY_TXT);
 		exit(-1);
 	}
 
-	status = fsl_usmmgr_dump_memory(d_buf, SIZE);
+	status = fsl_usmmgr_dump_memory(d_buf, size);
 
 	if (status < 0) {
 		fprintf(fd , "Error dump_memory_dsp status is (%i) 0x%x \n",
@@ -38,6 +54,8 @@ int main()
 			status, status);
 
 		fprintf(fd, "%s", "\n");
+
+		fwrite(d_buf, 1, status, fd_b);
 
 		for (i = 0 ; i < status/4; i++) {
 			fprintf(fd, "  %08lx", dbuff[i]);
@@ -52,5 +70,6 @@ int main()
 
 	free(d_buf);
 	fclose(fd);
+	fclose(fd_b);
 	return 0;
 }
