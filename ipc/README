@@ -7,6 +7,16 @@ shared memory manager is also provided as a user space library (libmem.so).
 In order to use IPC services, user space application needs to be linked
 with these libraries.
 
+IPC support for Multiple Application
+------------------------------------
+Support added for accessing an IPC channel by multiple applications, simultaneously.
+This support is disabled by default and can be enabled  during compile time using a
+compilation flag CONFIG_LOCK.
+
+If this support is enabled then, internally, a lock is obtained on IPC channel before
+performing any Rx, Tx operation on that channel. This will be an overhead in case where
+only a single application is using the IPC Module.
+
 Directory Structure
 -------------------
 ipc/include     -       Include directory for IPC public and private
@@ -26,6 +36,9 @@ Compilation Procedure
 	      ipc_test67, dump_mem - gets created under ipc directory ,
 			    dsp_bt - gets created under
 				     dsp_boot directory
+5. For enabling access of IPC channel by multiple application, pass "CONFIG_LOCK=1"
+flag as an argument to make as follows:
+     make CONFIG_LOCK=1
 
 bootargs Required
 -----------------
