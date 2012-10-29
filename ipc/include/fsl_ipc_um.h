@@ -12,7 +12,7 @@
 #include "fsl_types.h"
 #include "fsl_user_dma.h"
 #include "fsl_bsc913x_ipc.h"
-
+#include "bsc913x_heterogeneous_ipc.h"
 #define MAX_CHANNELS 64
 
 typedef struct {
@@ -47,7 +47,10 @@ typedef struct {
 	range_t		pa_ccsr;
 
 	fsl_udma_t	udma;
-
+#ifdef CONFIG_MULTI_RAT
+	int 		rat_id;
+	os_het_ipc_t	*ipc_inst;
+#endif
 } ipc_userspace_t;
 
 #endif /* FSL_IPC_UM_H_ */

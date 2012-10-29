@@ -38,28 +38,36 @@ int ch_semid[MAX_IPC_CHANNELS];
 #define GCR_OFFSET 0x17000
 
 #define SH_CTRL_VADDR(A) \
-		(void *)((phys_addr_t)(A) \
-		- (ipc_priv->sh_ctrl_area.phys_addr) \
-		+  ipc_priv->sh_ctrl_area.vaddr)
+	(void *)((phys_addr_t)(A) \
+			- (ipc_priv->sh_ctrl_area.phys_addr) \
+			+  ipc_priv->sh_ctrl_area.vaddr)
 
 int init_het_ipc(ipc_userspace_t *ipc);
 uint32_t ipc_get_free_rt_signal(void);
 static void *get_channel_vaddr(uint32_t channel_id,
-					ipc_userspace_t *ipc_priv);
+		ipc_userspace_t *ipc_priv);
 static void *__get_channel_vaddr(uint32_t channel_id,
-					ipc_userspace_t *ipc_priv);
+		ipc_userspace_t *ipc_priv);
 static phys_addr_t get_channel_paddr(uint32_t channel_id,
-					ipc_userspace_t *ipc_priv);
+		ipc_userspace_t *ipc_priv);
 static phys_addr_t __get_channel_paddr(uint32_t channel_id,
-					ipc_userspace_t *ipc_priv);
+		ipc_userspace_t *ipc_priv);
 int get_channels_info(ipc_userspace_t *ipc);
 void generate_indication(os_het_ipc_channel_t *ipc_ch,
-			ipc_userspace_t *ipc_priv);
+		ipc_userspace_t *ipc_priv);
 void signal_handler(int signo, siginfo_t *siginfo, void *data);
-
+#ifdef CONFIG_MULTI_RAT
+int get_ipc_vaddr(ipc_userspace_t *ipc_priv, int inst_id);
+int get_ipc_inst(ipc_userspace_t *ipc_priv, uint32_t inst_id);
+#endif
 /***** Implementation ******************/
+#ifdef CONFIG_MULTI_RAT
+fsl_ipc_t fsl_ipc_init(uint32_t rat_id, ipc_p2v_t p2vcb, range_t sh_ctrl_area,
+		range_t dsp_ccsr, range_t pa_ccsr)
+#else
 fsl_ipc_t fsl_ipc_init(ipc_p2v_t p2vcb, range_t sh_ctrl_area,
 		range_t dsp_ccsr, range_t pa_ccsr)
+#endif
 {
 	int ret = ERR_SUCCESS;
 	ipc_userspace_t *ipc_priv = NULL;
@@ -89,8 +97,12 @@ fsl_ipc_t fsl_ipc_init(ipc_p2v_t p2vcb, range_t sh_ctrl_area,
 		goto end;
 
 	/* Read number of channels and
-	max msg size from sh_ctrl_area */
+	   max msg size from sh_ctrl_area */
+#ifdef CONFIG_MULTI_RAT
+	ret = get_ipc_inst(ipc_priv, rat_id);
+#else
 	ret = get_channels_info(ipc_priv);
+#endif
 	if (ret)
 		goto end;
 
@@ -98,6 +110,9 @@ fsl_ipc_t fsl_ipc_init(ipc_p2v_t p2vcb, range_t sh_ctrl_area,
 		chvpaddr_arr[i].phys_addr = __get_channel_paddr(i, ipc_priv);
 		chvpaddr_arr[i].vaddr = __get_channel_vaddr(i, ipc_priv);
 	}
+#ifdef CONFIG_MULTI_RAT
+	ipc_priv->rat_id = rat_id;
+#endif
 
 #ifdef CONFIG_LOCK
 	for (i = 0; i < MAX_IPC_CHANNELS; i++)
@@ -146,7 +161,7 @@ void fsl_ipc_exit(fsl_ipc_t ipc)
  * It is assumed that the lock is taken by the caller.
  */
 int ipc_channel_attach_msg_ring(uint32_t channel_id, phys_addr_t msg_phys_addr,
-				uint32_t msg_size, ipc_userspace_t *ipc_priv)
+		uint32_t msg_size, ipc_userspace_t *ipc_priv)
 {
 	int depth;
 	int ret = ERR_SUCCESS;
@@ -170,9 +185,9 @@ int ipc_channel_attach_msg_ring(uint32_t channel_id, phys_addr_t msg_phys_addr,
 }
 
 int fsl_ipc_configure_channel(uint32_t channel_id, uint32_t depth,
-			ipc_ch_type_t channel_type,
-			phys_addr_t msg_ring_paddr, uint32_t msg_size,
-			ipc_cbfunc_t cbfunc, fsl_ipc_t ipc)
+		ipc_ch_type_t channel_type,
+		phys_addr_t msg_ring_paddr, uint32_t msg_size,
+		ipc_cbfunc_t cbfunc, fsl_ipc_t ipc)
 {
 	int 				ret = ERR_SUCCESS;
 	ipc_channel_us_t		*uch;
@@ -203,7 +218,7 @@ int fsl_ipc_configure_channel(uint32_t channel_id, uint32_t depth,
 		ch->ch_type = channel_type;
 		if (channel_type == IPC_MSG_CH)
 			ipc_channel_attach_msg_ring(channel_id, msg_ring_paddr,
-				msg_size, ipc_priv);
+					msg_size, ipc_priv);
 
 		ch->ipc_ind = OS_HET_NO_INT;
 	}
@@ -212,7 +227,7 @@ int fsl_ipc_configure_channel(uint32_t channel_id, uint32_t depth,
 	uch = calloc(1, sizeof(ipc_channel_us_t));
 	if (!uch) {
 		debug_print("Memory Allocation Failure with error %d\n",
-			    errno);
+				errno);
 		ret = -ERR_CALLOC;
 		EXIT(ret);
 		goto end;
@@ -233,7 +248,7 @@ end:
 }
 
 int fsl_ipc_configure_txreq(uint32_t channel_id, phys_addr_t phys_addr,
-			uint32_t max_txreq_lbuff_size, fsl_ipc_t ipc)
+		uint32_t max_txreq_lbuff_size, fsl_ipc_t ipc)
 {
 	int ret;
 	int locked = 0;
@@ -262,7 +277,7 @@ int fsl_ipc_configure_txreq(uint32_t channel_id, phys_addr_t phys_addr,
 
 	if (ipc_ch->producer_initialized != OS_HET_INITIALIZED) {
 		printf("Producer must open TxReq channel %d before doing "
-		       "its configuration\n", channel_id);
+				"its configuration\n", channel_id);
 		ret =  -ERR_PRODUCER_NOT_INIT;
 		EXIT(ret);
 		goto end;
@@ -275,7 +290,7 @@ int fsl_ipc_configure_txreq(uint32_t channel_id, phys_addr_t phys_addr,
 	ipc_priv->max_txreq_lbuff_size = max_txreq_lbuff_size;
 
 	/* Get spare area vaddr */
-/*FIXME: Currently extra memory is taken for saving dma descriptors*/
+	/*FIXME: Currently extra memory is taken for saving dma descriptors*/
 	phys_addr_s = ipc_priv->txreq_tb_lbuff_paddr +
 		(ipc_ch->bd_ring_size) * ipc_priv->max_txreq_lbuff_size;
 
@@ -291,7 +306,12 @@ int fsl_ipc_configure_txreq(uint32_t channel_id, phys_addr_t phys_addr,
 
 	dma_list_mem.vaddr = (*ipc_priv->p2vcb)(phys_addr_s);
 
-	ipc_priv->udma = fsl_uspace_dma_init(dma_list_mem, ipc_priv->pa_ccsr);
+	ipc_priv->udma = fsl_uspace_dma_init(dma_list_mem, ipc_priv->pa_ccsr
+#ifndef CONFIG_MULTI_RAT
+			);
+#else
+			, ipc_priv->rat_id);
+#endif
 
 end:
 	if (locked)
@@ -346,7 +366,7 @@ int fsl_ipc_send_tx_req(uint32_t channel_id, sg_list_t *sgl,
 
 	/* copy txreq */
 	bd_base = SH_CTRL_VADDR(ipc_ch->bd_base);
-/*OLD	bd = &bd_base[ipc_ch->tracker.producer_num]; */
+	/*OLD	bd = &bd_base[ipc_ch->tracker.producer_num]; */
 	bd = &bd_base[ipc_ch->LOCAL_PRODUCER_NUM];
 
 	phys_addr = bd->msg_ptr;
@@ -359,38 +379,38 @@ int fsl_ipc_send_tx_req(uint32_t channel_id, sg_list_t *sgl,
 	}
 
 	debug_print("copying %x to %x length %x\n",
-		vaddr, tx_req_vaddr, tx_req_len);
+			vaddr, tx_req_vaddr, tx_req_len);
 	memcpy(vaddr, tx_req_vaddr, tx_req_len);
 
 	/*OLD	phys_addr = ipc_priv->txreq_tb_lbuff_paddr +
-	ipc_ch->tracker.producer_num*ipc_priv->max_txreq_lbuff_size;*/
+	  ipc_ch->tracker.producer_num*ipc_priv->max_txreq_lbuff_size;*/
 	phys_addr = ipc_priv->txreq_tb_lbuff_paddr +
 		ipc_ch->LOCAL_PRODUCER_NUM * ipc_priv->max_txreq_lbuff_size;
 
 	/*write the lbuff address at the end of the message */
 	debug_print("copying %x to %x length %x\n", ((uint32_t)vaddr +
-		MAX_TX_REQ_MSG_SIZE), phys_addr,
+				MAX_TX_REQ_MSG_SIZE), phys_addr,
 			sizeof(phys_addr_t));
 	memcpy((void *)((uint32_t)vaddr + MAX_TX_REQ_MSG_SIZE),
-		&phys_addr, sizeof(phys_addr_t));
+			&phys_addr, sizeof(phys_addr_t));
 
 	ctr = 0;
 	while (sgl->entry[ctr].is_valid) {
 		debug_print("%x %x %x\n", sgl->entry[ctr].is_valid,
-			sgl->entry[ctr].src_addr, sgl->entry[ctr].len);
+				sgl->entry[ctr].src_addr, sgl->entry[ctr].len);
 		if (sgl->entry[ctr].is_tb_start)	{
 			/*check for alignment*/
 		}
 		fsl_uspace_dma_add_entry(sgl->entry[ctr].src_addr, phys_addr,
-			sgl->entry[ctr].len, ipc_priv->udma);
+				sgl->entry[ctr].len, ipc_priv->udma);
 		phys_addr += sgl->entry[ctr].len;
 		ctr++;
 		/* Alignment */
 	}
 	/* Get spare area vaddr */
 	phys_addr = ipc_priv->txreq_tb_lbuff_paddr +
-			(ipc_ch->bd_ring_size) *
-			ipc_priv->max_txreq_lbuff_size;
+		(ipc_ch->bd_ring_size) *
+		ipc_priv->max_txreq_lbuff_size;
 
 	vaddr = (*ipc_priv->p2vcb)(phys_addr);
 	incr1 = ipc_ch->tracker.producer_num + 1;
@@ -398,18 +418,18 @@ int fsl_ipc_send_tx_req(uint32_t channel_id, sg_list_t *sgl,
 
 	debug_print("## Writing P=%x V=%x #=%x\n",
 			phys_addr, vaddr, incr1);
-	 /* Add producer increment */
+	/* Add producer increment */
 	memcpy(vaddr, &incr1, sizeof(uint32_t));
 	/* Get physical address of producer_num */
 	phys_addr2 = get_channel_paddr(channel_id, ipc_priv);
 	debug_print("TXREQ 0: %x %x\n", phys_addr2, channel_id);
 	phys_addr2 += (uint32_t)&ipc_ch->tracker.producer_num -
-			(uint32_t)ipc_ch;
+		(uint32_t)ipc_ch;
 	debug_print("TXREQ: PIaddr=%x val=%x\n",
 			phys_addr2, phys_addr);
 
 	fsl_uspace_dma_add_entry(phys_addr, phys_addr2,
-		sizeof(phys_addr_t), ipc_priv->udma);
+			sizeof(phys_addr_t), ipc_priv->udma);
 
 	/* Get physical address of LOCAL_PRODUCER_NUM */
 	memcpy((void *)((uint32_t)vaddr + 4), &incr2, sizeof(uint32_t));
@@ -428,10 +448,10 @@ int fsl_ipc_send_tx_req(uint32_t channel_id, sg_list_t *sgl,
 	/* VIRQ geneartion */
 	if (ipc_ch->ipc_ind == OS_HET_VIRTUAL_INT) {
 		phys_addr2 = ipc_priv->dsp_ccsr.phys_addr + GCR_OFFSET +
-				ipc_ch->ind_offset;
+			ipc_ch->ind_offset;
 		memcpy(((void *)(uint32_t)vaddr + 8), &ipc_ch->ind_value, 4);
 		debug_print("TXREQ: INDaddr=%x val=%x\n",
-			phys_addr2, phys_addr);
+				phys_addr2, phys_addr);
 
 		fsl_uspace_dma_add_entry(phys_addr + 8, phys_addr2,
 				sizeof(phys_addr_t), ipc_priv->udma);
@@ -492,7 +512,7 @@ int fsl_ipc_set_consumed_status(uint32_t channel_id, fsl_ipc_t ipc)
 	if (!OS_HET_CH_EMPTY(ipc_ch)) {
 		OS_HET_INCREMENT_CONSUMER(ipc_ch);
 		ipc_ch->LOCAL_CONSUMER_NUM = (ipc_ch->LOCAL_CONSUMER_NUM +
-						1) % ipc_ch->bd_ring_size;
+				1) % ipc_ch->bd_ring_size;
 	}
 
 end:
@@ -532,7 +552,7 @@ int fsl_ipc_chk_recv_status(uint64_t *bmask, fsl_ipc_t ipc)
 
 		if (!OS_HET_CH_EMPTY(ipc_ch))
 			*bmask |=
-			((uint64_t)1)<<(63 - ch->channel_id);
+				((uint64_t)1)<<(63 - ch->channel_id);
 	}
 	EXIT(0);
 	return ERR_SUCCESS;
@@ -540,7 +560,7 @@ int fsl_ipc_chk_recv_status(uint64_t *bmask, fsl_ipc_t ipc)
 
 /* Blocking calls*/
 int fsl_ipc_send_ptr(uint32_t channel_id, phys_addr_t addr, uint32_t len,
-			fsl_ipc_t ipc)
+		fsl_ipc_t ipc)
 {
 	os_het_ipc_bd_t	*bd_base;
 	os_het_ipc_bd_t	*bd;
@@ -602,22 +622,22 @@ end:
 void dump_ipc_channel(os_het_ipc_channel_t *ipc_ch)
 {
 	debug_print("ipc_ch%x PI=%x CI=%x ID=%x PN=%x CN=%x LPI=%x LCI=%x \
-		BS=%x MX=%x CH=%x BD=%x II=%x IO=%x IV=%x",
-	(uint32_t)ipc_ch,
-	ipc_ch->producer_initialized,
-	ipc_ch->consumer_initialized,
-	ipc_ch->id,
-	ipc_ch->tracker.producer_num,
-	ipc_ch->tracker.consumer_num,
-	ipc_ch->LOCAL_PRODUCER_NUM,
-	ipc_ch->LOCAL_CONSUMER_NUM,
-	ipc_ch->bd_ring_size,
-	ipc_ch->max_msg_size,
-	ipc_ch->ch_type,
-	(uint32_t)ipc_ch->bd_base,
-	ipc_ch->ipc_ind,
-	ipc_ch->ind_offset,
-	ipc_ch->ind_value);
+			BS=%x MX=%x CH=%x BD=%x II=%x IO=%x IV=%x",
+			(uint32_t)ipc_ch,
+			ipc_ch->producer_initialized,
+			ipc_ch->consumer_initialized,
+			ipc_ch->id,
+			ipc_ch->tracker.producer_num,
+			ipc_ch->tracker.consumer_num,
+			ipc_ch->LOCAL_PRODUCER_NUM,
+			ipc_ch->LOCAL_CONSUMER_NUM,
+			ipc_ch->bd_ring_size,
+			ipc_ch->max_msg_size,
+			ipc_ch->ch_type,
+			(uint32_t)ipc_ch->bd_base,
+			ipc_ch->ipc_ind,
+			ipc_ch->ind_offset,
+			ipc_ch->ind_value);
 
 }
 
@@ -638,7 +658,7 @@ int fsl_ipc_open_prod_ch(uint32_t channel_id, fsl_ipc_t ipc)
 }
 
 int fsl_ipc_send_msg(uint32_t channel_id, void *src_buf_addr, uint32_t len,
-			fsl_ipc_t ipc)
+		fsl_ipc_t ipc)
 {
 	void *vaddr;
 	int ret = ERR_SUCCESS;
@@ -702,7 +722,7 @@ int fsl_ipc_send_msg(uint32_t channel_id, void *src_buf_addr, uint32_t len,
 
 	OS_HET_INCREMENT_PRODUCER(ipc_ch);
 	ipc_ch->LOCAL_PRODUCER_NUM = (ipc_ch->LOCAL_PRODUCER_NUM + 1) %
-					ipc_ch->bd_ring_size;
+		ipc_ch->bd_ring_size;
 
 	if (ipc_ch->ipc_ind != OS_HET_NO_INT) {
 		generate_indication(ipc_ch, ipc_priv);
@@ -715,7 +735,7 @@ end:
 }
 
 int fsl_ipc_recv_ptr(uint32_t channel_id, phys_addr_t *addr, uint32_t *len,
-			fsl_ipc_t ipc)
+		fsl_ipc_t ipc)
 {
 	int ret = ERR_SUCCESS;
 	os_het_ipc_bd_t	*bd_base;
@@ -762,7 +782,7 @@ int fsl_ipc_recv_ptr(uint32_t channel_id, phys_addr_t *addr, uint32_t *len,
 
 	OS_HET_INCREMENT_CONSUMER(ipc_ch);
 	ipc_ch->LOCAL_CONSUMER_NUM = (ipc_ch->LOCAL_CONSUMER_NUM + 1) %
-					ipc_ch->bd_ring_size;
+		ipc_ch->bd_ring_size;
 
 end:
 	if (locked)
@@ -773,7 +793,7 @@ end:
 }
 
 int fsl_ipc_recv_ptr_hold(uint32_t channel_id, phys_addr_t *addr, uint32_t *len,
-			fsl_ipc_t ipc)
+		fsl_ipc_t ipc)
 {
 	int ret = ERR_SUCCESS;
 	int locked = 0;
@@ -857,7 +877,7 @@ int fsl_ipc_recv_msg(uint32_t channel_id, void *addr, uint32_t *len,
 
 	OS_HET_INCREMENT_CONSUMER(ipc_ch);
 	ipc_ch->LOCAL_CONSUMER_NUM = (ipc_ch->LOCAL_CONSUMER_NUM + 1) %
-					ipc_ch->bd_ring_size;
+		ipc_ch->bd_ring_size;
 
 end:
 	if (locked)
@@ -866,7 +886,7 @@ end:
 }
 
 int fsl_ipc_recv_msg_ptr(uint32_t channel_id, void **dst_buffer,
-			uint32_t *len, fsl_ipc_t ipc)
+		uint32_t *len, fsl_ipc_t ipc)
 {
 	int ret = ERR_SUCCESS;
 	int locked = 0;
@@ -922,7 +942,7 @@ end:
  * Type: Internal
  */
 void generate_indication(os_het_ipc_channel_t *ipc_ch,
-			ipc_userspace_t *ipc_priv)
+		ipc_userspace_t *ipc_priv)
 {
 	void *addr;
 	uint32_t value = ipc_ch->ind_value;
@@ -1007,6 +1027,31 @@ end:
 	EXIT(ret);
 	return ret;
 }
+#ifdef CONFIG_MULTI_RAT
+int get_ipc_inst(ipc_userspace_t *ipc_priv, uint32_t inst_id)
+{
+	int ret = ERR_SUCCESS;
+	ENTER();
+
+	os_het_control_t *sh_ctrl =  ipc_priv->sh_ctrl_area.vaddr;
+	os_het_ipc_t *ipc = SH_CTRL_VADDR(sh_ctrl->ipc)
+				+ sizeof(os_het_ipc_t)*inst_id;
+	if (!ipc) {
+		ret = -1;
+		goto end;
+	}
+	if (ipc->num_ipc_channels > MAX_CHANNELS) {
+		ret = -1;
+		goto end;
+	}
+	ipc_priv->max_channels = ipc->num_ipc_channels;
+	ipc_priv->max_depth = ipc->ipc_max_bd_size;
+	ipc_priv->ipc_inst = ipc;
+end:
+	EXIT(ret);
+	return ret;
+}
+#endif
 /*
  * @get_channel_paddr
  *
@@ -1016,17 +1061,19 @@ end:
  * Type: Internal function
  */
 static phys_addr_t __get_channel_paddr(uint32_t channel_id,
-					ipc_userspace_t *ipc_priv)
+		ipc_userspace_t *ipc_priv)
 {
 	phys_addr_t		phys_addr;
 
 	ENTER();
-
+#ifndef CONFIG_MULTI_RAT
 	os_het_control_t *sh_ctrl =  ipc_priv->sh_ctrl_area.vaddr;
 	os_het_ipc_t *ipc = SH_CTRL_VADDR(sh_ctrl->ipc);
+#else
+	os_het_ipc_t *ipc = (os_het_ipc_t *)ipc_priv->ipc_inst;
+#endif
 	phys_addr = (phys_addr_t)ipc->ipc_channels +
-			sizeof(os_het_ipc_channel_t)*channel_id;
-
+		sizeof(os_het_ipc_channel_t)*channel_id;
 	EXIT(phys_addr);
 	return phys_addr;
 }
@@ -1039,7 +1086,7 @@ static phys_addr_t __get_channel_paddr(uint32_t channel_id,
  * Type: Internal function
  */
 static void *__get_channel_vaddr(uint32_t channel_id,
-					ipc_userspace_t *ipc_priv)
+		ipc_userspace_t *ipc_priv)
 {
 	void *vaddr;
 	ENTER();
@@ -1058,7 +1105,7 @@ static void *__get_channel_vaddr(uint32_t channel_id,
  * Type: Internal function
  */
 static phys_addr_t get_channel_paddr(uint32_t channel_id,
-					ipc_userspace_t *ipc_priv)
+		ipc_userspace_t *ipc_priv)
 {
 	return chvpaddr_arr[channel_id].phys_addr;
 }

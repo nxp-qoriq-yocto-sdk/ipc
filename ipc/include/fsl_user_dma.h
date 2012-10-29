@@ -47,7 +47,12 @@ typedef void *fsl_udma_t;
  *			of the reserved memory is provided with dma_list_mem
  *
 *****************************************************************************/
+#ifndef CONFIG_MULTI_RAT
 fsl_udma_t fsl_uspace_dma_init(range_t dma_list_mem, range_t pa_ccsr);
+#else
+fsl_udma_t fsl_uspace_dma_init(range_t dma_list_mem, range_t pa_ccsr,
+		uint32_t dma_ch_id);
+#endif
 /*****************************************************************************
  * @fsl_uspace_dma_add_entry
  *

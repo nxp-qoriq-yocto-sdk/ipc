@@ -43,6 +43,7 @@
 
 #define DMA_ADDR        0x21000
 #define DMA_REG_OFFSET  0x100
+#define DMA_CH_OFFSET	0x80
 #define DMA_ATTR        0x00050000
 #define DMA_DEST_ATTR	0x00040000
 #define DMA_BUSY        4
@@ -112,7 +113,12 @@ typedef struct {
 	dma_list_t *dma_list;
 } uspace_dma_t;
 
+#ifndef CONFIG_MULTI_RAT
 fsl_udma_t fsl_uspace_dma_init(range_t dma_list_mem, range_t pa_ccsr)
+#else
+fsl_udma_t fsl_uspace_dma_init(range_t dma_list_mem, range_t pa_ccsr,
+			uint32_t dma_ch_id)
+#endif
 {
 	void *dma;
 	ENTER();
@@ -124,7 +130,12 @@ fsl_udma_t fsl_uspace_dma_init(range_t dma_list_mem, range_t pa_ccsr)
 	dma = pa_ccsr.vaddr + DMA_ADDR;
 	debug_print("dma addr = %x\n", (uint32_t) dma);
 	dma_priv->dma =
-	    (volatile dma_regs_t *)((unsigned long)dma + DMA_REG_OFFSET);
+	    (volatile dma_regs_t *)((unsigned long)dma + DMA_REG_OFFSET
+#ifdef CONFIG_MULTI_RAT
+			+dma_ch_id*DMA_CH_OFFSET);
+#else
+			);
+#endif
 	dma_priv->dma_list = (dma_list_t *) dma_list_mem.vaddr;
 	fsl_uspace_dma_list_clear(dma_priv);
 

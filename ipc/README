@@ -49,7 +49,7 @@ hugepages=1
 max_num_ipc_channels=64
 max_channel_depth=16
 
-Test Application
+Test Application (Single RAT only Solutions)
 ----------------
 Test applications (ipc_test, ipc_test67) can be started once the DSP image
 (ipc_913x_dbg_0.5.bin, present in rootfs under /DSP_images) is loaded
@@ -90,6 +90,32 @@ $./ipc_test
 
 For Channel 6-7
 $./ipc_test67
+
+Test Application (Multi RAT)
+----------------
+ipc_test_mrat and ipc_test67_mrat is added for testing multirat support from PA side.
+To test multi rat without actual dsp image ipc_test_dsp_stub is provided.
+
+ipc_test_mrat
+	is same as ipc_test but with an addition that at the time of execution
+	a command line argument can be provided as the rat_id.
+	
+	for eg: 
+
+		ipc_test_mrat 0 would run the test for rat_id 0 
+		ipc_test_mrat 1 would run the test for rat_id 1
+
+ipc_test67_mrat
+	is same as ipc_test67 but with an addition that rat_id can be specified
+	Also channel 7 operation is not there.
+
+ipc_test_dsp_stub
+	This application is added to test MultiRAT without DSP. This can be used with 
+	ipc_test_mrat and ipc_test67_mrat.
+	This application also takes rat_id as input paramter.
+
+	Note: It should be executed before any pa tests.
+
 
 
 Memory Dump
