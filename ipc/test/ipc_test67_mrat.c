@@ -206,7 +206,7 @@ void test_init(int rat_id)
 		return;
 	}
 
-	ipc = fsl_ipc_init(
+	ipc = fsl_ipc_init_rat(
 			rat_id,
 			test_p2v, sh_ctrl, dsp_ccsr, pa_ccsr);
 

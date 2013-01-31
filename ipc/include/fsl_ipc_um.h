@@ -1,8 +1,9 @@
 /*
  *  @ fsl_bsc913x_ipc_kern_mod.c
  *
- * Copyright 2011-2012 Freescale Semiconductor, Inc.
+ * Copyright 2011-2013 Freescale Semiconductor, Inc.
  *
+ * Author: Ashish Kumar <ashish.kumar@freescale.com>
  * Author: Manish Jaggi <manish.jaggi@freescale.com>
  */
 
@@ -47,10 +48,8 @@ typedef struct {
 	range_t		pa_ccsr;
 
 	fsl_udma_t	udma;
-#ifdef CONFIG_MULTI_RAT
 	int 		rat_id;
 	os_het_ipc_t	*ipc_inst;
-#endif
 } ipc_userspace_t;
 
 #endif /* FSL_IPC_UM_H_ */

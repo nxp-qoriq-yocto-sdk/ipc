@@ -1,8 +1,8 @@
 /*
  * @fsl_user_dma.h
  *
- * Copyright (c) 2011
- *  Freescale Semiconductor Inc.  All rights reserved.
+ * Copyright (c) 2011-2013
+ *  Freescale Semiconductor Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,6 +30,7 @@
  *
  *	Author: Manish Jaggi <manish.jaggi@freescale.com>
  *	Author: Pankaj Chauhan <pankaj.chauhan@freescale.com>
+ *	Author: Ashish Kumar <ashish.kumar@freescale.com>
  */
 #ifndef _FSL_USER_DMA_H
 #define _FSL_USER_DMA_H
@@ -47,12 +48,8 @@ typedef void *fsl_udma_t;
  *			of the reserved memory is provided with dma_list_mem
  *
 *****************************************************************************/
-#ifndef CONFIG_MULTI_RAT
-fsl_udma_t fsl_uspace_dma_init(range_t dma_list_mem, range_t pa_ccsr);
-#else
 fsl_udma_t fsl_uspace_dma_init(range_t dma_list_mem, range_t pa_ccsr,
 		uint32_t dma_ch_id);
-#endif
 /*****************************************************************************
  * @fsl_uspace_dma_add_entry
  *

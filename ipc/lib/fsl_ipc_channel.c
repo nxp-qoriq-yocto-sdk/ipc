@@ -1,9 +1,10 @@
 /*
  *  @ fsl_ipc_channel.c
  *
- * Copyright 2011-2012 Freescale Semiconductor, Inc.
+ * Copyright 2011-2013 Freescale Semiconductor, Inc.
  *
  * Author: Manish Jaggi <manish.jaggi@freescale.com>
+ * Author: Ashish Kumar <ashish.kumar@freescale.com>
  */
 #include <stdio.h>
 #include <fcntl.h>
@@ -29,8 +30,8 @@
 #define LOCAL_PRODUCER_NUM pa_reserved[0]
 #define LOCAL_CONSUMER_NUM pa_reserved[1]
 
-range_t chvpaddr_arr[MAX_IPC_CHANNELS];
-int ch_semid[MAX_IPC_CHANNELS];
+range_t chvpaddr_arr[TOTAL_IPC_CHANNELS];
+int ch_semid[TOTAL_IPC_CHANNELS];
 
 /*********** Defines ******************/
 #define MAX_MSG_SIZE 1020
@@ -52,22 +53,24 @@ static phys_addr_t get_channel_paddr(uint32_t channel_id,
 		ipc_userspace_t *ipc_priv);
 static phys_addr_t __get_channel_paddr(uint32_t channel_id,
 		ipc_userspace_t *ipc_priv);
-int get_channels_info(ipc_userspace_t *ipc);
+int get_ipc_vaddr(ipc_userspace_t *ipc_priv, int inst_id);
+int get_ipc_inst(ipc_userspace_t *ipc_priv, uint32_t inst_id);
+int get_channels_info(ipc_userspace_t *ipc, uint32_t rat_id);
 void generate_indication(os_het_ipc_channel_t *ipc_ch,
 		ipc_userspace_t *ipc_priv);
 void signal_handler(int signo, siginfo_t *siginfo, void *data);
-#ifdef CONFIG_MULTI_RAT
-int get_ipc_vaddr(ipc_userspace_t *ipc_priv, int inst_id);
-int get_ipc_inst(ipc_userspace_t *ipc_priv, uint32_t inst_id);
-#endif
 /***** Implementation ******************/
-#ifdef CONFIG_MULTI_RAT
-fsl_ipc_t fsl_ipc_init(uint32_t rat_id, ipc_p2v_t p2vcb, range_t sh_ctrl_area,
-		range_t dsp_ccsr, range_t pa_ccsr)
-#else
 fsl_ipc_t fsl_ipc_init(ipc_p2v_t p2vcb, range_t sh_ctrl_area,
 		range_t dsp_ccsr, range_t pa_ccsr)
-#endif
+{
+	uint32_t rat_id = 0;
+	return fsl_ipc_init_rat(rat_id, p2vcb, sh_ctrl_area,
+		dsp_ccsr, pa_ccsr);
+}
+
+
+fsl_ipc_t fsl_ipc_init_rat(uint32_t rat_id, ipc_p2v_t p2vcb,
+	range_t sh_ctrl_area, range_t dsp_ccsr, range_t pa_ccsr)
 {
 	int ret = ERR_SUCCESS;
 	ipc_userspace_t *ipc_priv = NULL;
@@ -98,24 +101,19 @@ fsl_ipc_t fsl_ipc_init(ipc_p2v_t p2vcb, range_t sh_ctrl_area,
 
 	/* Read number of channels and
 	   max msg size from sh_ctrl_area */
-#ifdef CONFIG_MULTI_RAT
-	ret = get_ipc_inst(ipc_priv, rat_id);
-#else
-	ret = get_channels_info(ipc_priv);
-#endif
+	ret = get_channels_info(ipc_priv, rat_id);
+
 	if (ret)
 		goto end;
 
-	for (i = 0; i < MAX_IPC_CHANNELS; i++) {
+	for (i = 0; i < TOTAL_IPC_CHANNELS; i++) {
 		chvpaddr_arr[i].phys_addr = __get_channel_paddr(i, ipc_priv);
 		chvpaddr_arr[i].vaddr = __get_channel_vaddr(i, ipc_priv);
 	}
-#ifdef CONFIG_MULTI_RAT
 	ipc_priv->rat_id = rat_id;
-#endif
 
 #ifdef CONFIG_LOCK
-	for (i = 0; i < MAX_IPC_CHANNELS; i++)
+	for (i = 0; i < TOTAL_IPC_CHANNELS; i++)
 		ch_semid[i] = fsl_ipc_init_lock(chvpaddr_arr[i].phys_addr);
 #endif
 end:
@@ -140,7 +138,7 @@ void fsl_ipc_exit(fsl_ipc_t ipc)
 	close(ipc_priv->dev_het_ipc);
 
 #ifdef CONFIG_LOCK
-	for (i = 0; i < MAX_IPC_CHANNELS; i++)
+	for (i = 0; i < TOTAL_IPC_CHANNELS; i++)
 		fsl_ipc_destroy_lock(ch_semid[i]);
 #endif
 
@@ -307,11 +305,7 @@ int fsl_ipc_configure_txreq(uint32_t channel_id, phys_addr_t phys_addr,
 	dma_list_mem.vaddr = (*ipc_priv->p2vcb)(phys_addr_s);
 
 	ipc_priv->udma = fsl_uspace_dma_init(dma_list_mem, ipc_priv->pa_ccsr
-#ifndef CONFIG_MULTI_RAT
-			);
-#else
 			, ipc_priv->rat_id);
-#endif
 
 end:
 	if (locked)
@@ -1010,24 +1004,7 @@ void signal_handler(int signo, siginfo_t *siginfo, void *data)
  *
  * Type: Internal function
  */
-int get_channels_info(ipc_userspace_t *ipc_priv)
-{
-	int ret = ERR_SUCCESS;
-	ENTER();
 
-	os_het_control_t *sh_ctrl =  ipc_priv->sh_ctrl_area.vaddr;
-	os_het_ipc_t *ipc = SH_CTRL_VADDR(sh_ctrl->ipc);
-	if (ipc->num_ipc_channels > MAX_CHANNELS) {
-		ret = -1;
-		goto end;
-	}
-	ipc_priv->max_channels = ipc->num_ipc_channels;
-	ipc_priv->max_depth = ipc->ipc_max_bd_size;
-end:
-	EXIT(ret);
-	return ret;
-}
-#ifdef CONFIG_MULTI_RAT
 int get_ipc_inst(ipc_userspace_t *ipc_priv, uint32_t inst_id)
 {
 	int ret = ERR_SUCCESS;
@@ -1051,7 +1028,11 @@ end:
 	EXIT(ret);
 	return ret;
 }
-#endif
+
+int get_channels_info(ipc_userspace_t *ipc_priv, uint32_t inst_id)
+{
+	return get_ipc_inst(ipc_priv, inst_id);
+}
 /*
  * @get_channel_paddr
  *
@@ -1066,12 +1047,9 @@ static phys_addr_t __get_channel_paddr(uint32_t channel_id,
 	phys_addr_t		phys_addr;
 
 	ENTER();
-#ifndef CONFIG_MULTI_RAT
-	os_het_control_t *sh_ctrl =  ipc_priv->sh_ctrl_area.vaddr;
-	os_het_ipc_t *ipc = SH_CTRL_VADDR(sh_ctrl->ipc);
-#else
+
 	os_het_ipc_t *ipc = (os_het_ipc_t *)ipc_priv->ipc_inst;
-#endif
+
 	phys_addr = (phys_addr_t)ipc->ipc_channels +
 		sizeof(os_het_ipc_channel_t)*channel_id;
 	EXIT(phys_addr);

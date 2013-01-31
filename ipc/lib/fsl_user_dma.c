@@ -1,8 +1,8 @@
 /*
  * @fsl_user_dma.c
  *
- * Copyright (c) 2011-2012
- *  Freescale Semiconductor Inc.  All rights reserved.
+ * Copyright (c) 2011-2013
+ *  Freescale Semiconductor Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,6 +30,7 @@
  *
  *      	Author: Manish Jaggi <manish.jaggi@freescale.com>
  *		Author: Pankaj Chauhan <pankaj.chauhan@freescale.com>
+ *		Author: Ashish Kumar <ashish.kumar@freescale.com>
  */
 #include <stdio.h>
 #include <fcntl.h>
@@ -113,12 +114,8 @@ typedef struct {
 	dma_list_t *dma_list;
 } uspace_dma_t;
 
-#ifndef CONFIG_MULTI_RAT
-fsl_udma_t fsl_uspace_dma_init(range_t dma_list_mem, range_t pa_ccsr)
-#else
 fsl_udma_t fsl_uspace_dma_init(range_t dma_list_mem, range_t pa_ccsr,
 			uint32_t dma_ch_id)
-#endif
 {
 	void *dma;
 	ENTER();
@@ -131,11 +128,7 @@ fsl_udma_t fsl_uspace_dma_init(range_t dma_list_mem, range_t pa_ccsr,
 	debug_print("dma addr = %x\n", (uint32_t) dma);
 	dma_priv->dma =
 	    (volatile dma_regs_t *)((unsigned long)dma + DMA_REG_OFFSET
-#ifdef CONFIG_MULTI_RAT
 			+dma_ch_id*DMA_CH_OFFSET);
-#else
-			);
-#endif
 	dma_priv->dma_list = (dma_list_t *) dma_list_mem.vaddr;
 	fsl_uspace_dma_list_clear(dma_priv);
 

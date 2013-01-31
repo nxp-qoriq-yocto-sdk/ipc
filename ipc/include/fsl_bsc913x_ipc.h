@@ -1,8 +1,9 @@
 /*
  * @fsl_bsc913x_ipc.h
  *
- * Copyright 2011-2012 Freescale Semiconductor, Inc.
+ * Copyright 2011-2013 Freescale Semiconductor, Inc.
  *
+ * Author: ashish kumar <ashish.kumar@freescale.com>
  * Author: Manish Jaggi <manish.jaggi@freescale.com>
  */
 
@@ -106,6 +107,24 @@ typedef void* (*ipc_p2v_t)(phys_addr_t phys_addr);
  *
  * Init function to initialize the IPC subsystem.
  *
+ * p2vcb 	- [IN][M]pointer to a function which does p2v
+ * sh_ctrl_area - [IN][M]range_t for shared control area
+ * dsp_ccsr 	- [IN][M]range_t for dsp_ccsr
+ * pa_ccsr 	- [IN][M]range_t for pa_ccsr
+ *
+ * Return Value -
+ *			fsl_ipc_t handle.
+ *			This has to be provided in all subsequent calls to ipc
+ *
+*****************************************************************************/
+fsl_ipc_t fsl_ipc_init(ipc_p2v_t p2vcb, range_t sh_ctrl_area, range_t dsp_ccsr,
+			range_t pa_ccsr);
+
+/*****************************************************************************
+ * @fsl_ipc_init_rat
+ *
+ * Init function to initialize the IPC subsystem.
+ *
  * rat_id	- [IN][M]id of the rat for which ipc is instantiated.
  *			This is used on in multiRAT scenerio.
  * p2vcb 	- [IN][M]pointer to a function which does p2v
@@ -118,13 +137,9 @@ typedef void* (*ipc_p2v_t)(phys_addr_t phys_addr);
  *			This has to be provided in all subsequent calls to ipc
  *
 *****************************************************************************/
-#ifdef CONFIG_MULTI_RAT
-fsl_ipc_t fsl_ipc_init(uint32_t rat_id, ipc_p2v_t p2vcb, range_t sh_ctrl_area,
-			range_t dsp_ccsr, range_t pa_ccsr);
-#else
-fsl_ipc_t fsl_ipc_init(ipc_p2v_t p2vcb, range_t sh_ctrl_area, range_t dsp_ccsr,
-			range_t pa_ccsr);
-#endif
+fsl_ipc_t fsl_ipc_init_rat(uint32_t rat_id, ipc_p2v_t p2vcb,
+		range_t sh_ctrl_area, range_t dsp_ccsr, range_t pa_ccsr);
+
 /*****************************************************************************
  * @ipc_configure_channel
  *
