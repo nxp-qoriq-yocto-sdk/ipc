@@ -1,6 +1,7 @@
 /*
- * Copyright 2011-2012 Freescale Semiconductor, Inc.
+ * Copyright 2011-2013 Freescale Semiconductor, Inc.
  *
+ * Author: Ashish Kumar <ashish.kumar@freescale.com>
  * Author: Manish Jaggi <manish.jaggi@freescale.com>
  */
 #include <stdio.h>
@@ -19,6 +20,7 @@
 fsl_usmmgr_t usmmgr;
 fsl_ipc_t ipc;
 int ch3init;
+int ch4init;
 void test_init(int rat_id);
 int rat_id;
 
@@ -76,6 +78,7 @@ void channel3_thread(void *ptr)
 			usleep(1000);
 		} while (ret == -ERR_CHANNEL_EMPTY);
 		if (ret) {
+			ENTER();
 			printf("\n ERROR ret %x \n", ret);
 			goto end;
 		}
@@ -96,6 +99,57 @@ end:
 	EXIT(ret);
 	pthread_exit(0);
 }
+void channel4_thread(void *ptr)
+{
+	phys_addr_t p;
+	uint32_t len;
+	int ret;
+	int depth = 16;
+	char retbuf[1024];
+	void *vaddr;
+	ENTER();
+	ret = fsl_ipc_configure_channel(4, depth, IPC_PTR_CH, 0, 0, NULL, ipc);
+	if (ret) {
+		printf("\n ret %x \n", ret);
+		EXIT(ret);
+		pthread_exit(0);
+	}
+	ch4init = 1;
+	while (1) {
+		do {
+			ret = fsl_ipc_recv_ptr(4, &p, &len, ipc);
+			usleep(1000);
+		} while (ret == -ERR_CHANNEL_EMPTY);
+		if (ret) {
+			printf("\n ERROR ret %x \n", ret);
+			goto end;
+		}
+		printf("\nR:C4:P:[%lx]L:%x\n", p, len);
+
+		vaddr = fsl_usmmgr_p2v(p, usmmgr);
+		if (!vaddr) {
+			ret = -ERR_NULL_VALUE;
+			printf("\n Error in translating physical address %lx"
+			       " to virtual address\n", p);
+			goto end;
+		}
+
+		memcpy(retbuf, vaddr, len);
+		do {
+			ret = fsl_ipc_send_msg(5, retbuf, len, ipc);
+			usleep(1000);
+		} while (ret == -ERR_CHANNEL_FULL);
+		if (ret) {
+			printf("Error code = %x\n", ret);
+			goto end;
+		}
+		printf("\nS:C5:M:L:%x\n", len);
+	}
+end:
+	printf("Exiting Thread for ch4/5\n");
+	EXIT(ret);
+	pthread_exit(0);
+}
 
 void *test_p2v(phys_addr_t phys_addr)
 {
@@ -104,10 +158,11 @@ void *test_p2v(phys_addr_t phys_addr)
 
 void test_init(int rat_id)
 {
+	uint64_t bmask;
 	int ret = 0;
-	int ret1;
+	int ret1, ret2;
 	char *buf = "Hello DSP.";
-	pthread_t thread1;
+	pthread_t thread1, thread2;
 	range_t sh_ctrl;
 	range_t dsp_ccsr;
 	range_t pa_ccsr;
@@ -148,6 +203,11 @@ void test_init(int rat_id)
 		printf("Issue with fsl_ipc_init %d\n", ret);
 		return;
 	}
+	do {
+		fsl_ipc_chk_recv_status(&bmask, ipc);
+		printf("\n main loop #ret %llx \n", bmask);
+		usleep(10000);
+	} while (!(isbitset(bmask, 0)));
 
 	fsl_ipc_open_prod_ch(2, ipc);
 	fsl_ipc_open_prod_ch(5, ipc);
@@ -159,7 +219,15 @@ void test_init(int rat_id)
 		return;
 	}
 
-	while (ch3init) {
+	ret2 = pthread_create(&thread2, NULL, (void *)&channel4_thread, NULL);
+	if (ret2) {
+		printf("pthread_create returns with error: %d", ret2);
+		return;
+	}
+
+	printf("ptherad_create %d %d\n", ret1, ret2);
+
+	while (!(ch3init && ch4init)) {
 		printf(".");
 		usleep(1000);
 	}
@@ -170,5 +238,6 @@ void test_init(int rat_id)
 
 	printf("\n[IPC_PA] S:C2:M:L:%x\n", 10);
 	pthread_join(thread1, NULL);
+	pthread_join(thread2, NULL);
 	EXIT(0);
 }

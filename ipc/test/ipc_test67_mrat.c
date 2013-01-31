@@ -1,6 +1,7 @@
 /*
- * Copyright 2011-2012 Freescale Semiconductor, Inc.
+ * Copyright 2011-2013 Freescale Semiconductor, Inc.
  *
+ * Author: Ashish Kumar <ashish.kumar@freescale.com>
  * Author: Manish Jaggi <manish.jaggi@freescale.com>
  */
 #include <stdio.h>
@@ -57,11 +58,9 @@ int isbitset(uint64_t v, int bit)
 
 void channel67_thread(void *ptr)
 {
-#if 0
 	phys_addr_t p;
 	uint32_t len;
 	int depth = 16;
-#endif
 	int ctr;
 	int ret;
 	range_t r;
@@ -69,15 +68,16 @@ void channel67_thread(void *ptr)
 	void *vaddr;
 	int first = 1;
 	char fapi_msg[1020];
+
 	ENTER();
-	#if 0
+
 	ret = fsl_ipc_configure_channel(7, depth, IPC_PTR_CH, 0, 0, NULL, ipc);
 	if (ret) {
 		printf("\n ret %d \n", ret);
 		EXIT(ret);
 		pthread_exit(0);
 	}
-	#endif
+
 	ch7init = 1;
 
 	r.size = 0x200000;
@@ -128,13 +128,13 @@ void channel67_thread(void *ptr)
 		/* vaddr = fsl_usmmgr_p2v(lst.entry[1].src_addr, usmmgr); */
 		memset(fapi_msg, 0x33+rat_id, 1020);
 		do {
-/*			if (!first)
+			if (!first)
 				while (fsl_ipc_get_last_tx_req_status(ipc)
 				       != TXREQ_DONE) {
 				       usleep(10000);
 				       printf(",");
 				}
-*/			ret =
+			ret =
 			    fsl_ipc_send_tx_req(6, &lst, &fapi_msg, 1020, ipc);
 			    usleep(10000);
 			first = 0;
@@ -144,7 +144,7 @@ void channel67_thread(void *ptr)
 			goto end;
 		}
 		printf("\n[IPC_PA %d]S:C6:TXREQ ctr=%d\n", rat_id, ctr);
-#if 0
+
 		do {
 			ret = fsl_ipc_recv_ptr(7, &p, &len, ipc);
 			usleep(1000);
@@ -154,7 +154,7 @@ void channel67_thread(void *ptr)
 			goto end;
 		}
 		printf("\nR:C7:P:[%lx]L:%x\n", p, len);
-#endif
+
 		ctr++;
 	}
 end:
