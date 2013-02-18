@@ -2,6 +2,7 @@ CC=$(CROSS_COMPILE)gcc
 AR=$(CROSS_COMPILE)ar
 HET_DIR=$(KERNEL_DIR)/drivers/misc
 CFLAGS=-Wall -O3 -lpthread -I ./include -I../fsl_shm/include -I $(HET_DIR) -Wall
+CFLAGS2=-Wall -I ./include -I../fsl_shm/include -I $(HET_DIR) -Wall
 
 ifeq ($(CONFIG_LOCK), 1)
 	CFLAGS+=-DCONFIG_LOCK
@@ -12,7 +13,8 @@ ipc_lib:
 	$(CC) -c ./lib/fsl_ipc_channel.c $(CFLAGS) -o ./lib/fsl_ipc_channel.o
 	$(CC) -c ./lib/fsl_user_dma.c $(CFLAGS) -o ./lib/fsl_user_dma.o
 	$(CC) -c ./lib/fsl_ipc_lock.c $(CFLAGS) -o ./lib/fsl_ipc_lock.o
-	$(CC) -shared -fPIC ./lib/fsl_user_dma.o ./lib/fsl_ipc_channel.o ./lib/fsl_ipc_lock.o -o libipc.so
+	$(CC) -c ../dsp_boot/libdspboot.c $(CFLAGS2) -o ../dsp_boot/libdspboot.o
+	$(CC) -shared -fPIC ./lib/fsl_user_dma.o ./lib/fsl_ipc_channel.o ./lib/fsl_ipc_lock.o ../dsp_boot/libdspboot.o -o libipc.so
 #	$(AR) rcs libipc.a ./lib/fsl_ipc_channel.o ./lib/fsl_user_dma.o
 
 mem_lib:

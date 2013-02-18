@@ -5,6 +5,7 @@
  *
  * Author: Manish Jaggi <manish.jaggi@freescale.com>
  * Author: Ashish Kumar <ashish.kumar@freescale.com>
+ *
  */
 #include <stdio.h>
 #include <fcntl.h>
@@ -59,6 +60,8 @@ int get_channels_info(ipc_userspace_t *ipc, uint32_t rat_id);
 void generate_indication(os_het_ipc_channel_t *ipc_ch,
 		ipc_userspace_t *ipc_priv);
 void signal_handler(int signo, siginfo_t *siginfo, void *data);
+void dump_ipc_channel(os_het_ipc_channel_t *);
+
 /***** Implementation ******************/
 fsl_ipc_t fsl_ipc_init(ipc_p2v_t p2vcb, range_t sh_ctrl_area,
 		range_t dsp_ccsr, range_t pa_ccsr)
@@ -240,6 +243,11 @@ int fsl_ipc_configure_channel(uint32_t channel_id, uint32_t depth,
 end:
 	if (locked)
 		fsl_ipc_unlock(ch_semid[channel_id]);
+
+#if DEBUG_RELOAD
+	printf("dump_ipc_channel_ in %s\n", __func__);
+	dump_ipc_channel(ch);
+#endif
 
 	EXIT(ret);
 	return ret;
@@ -615,7 +623,7 @@ end:
 
 void dump_ipc_channel(os_het_ipc_channel_t *ipc_ch)
 {
-	debug_print("ipc_ch%x PI=%x CI=%x ID=%x PN=%x CN=%x LPI=%x LCI=%x \
+	printf("ipc_ch%x PI=%x CI=%x ID=%x PN=%x CN=%x LPI=%x LCI=%x \
 			BS=%x MX=%x CH=%x BD=%x II=%x IO=%x IV=%x",
 			(uint32_t)ipc_ch,
 			ipc_ch->producer_initialized,
@@ -1118,4 +1126,86 @@ int init_het_ipc(ipc_userspace_t *ipc_priv)
 	EXIT(ret);
 	return ret;
 }
+void fsl_ipc_us_reinit(fsl_ipc_t ipc)
+{
+	int i;
+	ipc_userspace_t *ipc_priv = (ipc_userspace_t *)ipc;
+	reload_print("Entering func %s.... ipc_us_t num_channels=%d\n"
+		, __func__, ipc_priv->num_channels);
 
+
+#ifdef CONFIG_LOCK
+	for (i = 0; i < TOTAL_IPC_CHANNELS; i++)
+		fsl_ipc_destroy_lock(ch_semid[i]);
+#endif
+
+	/* free memory */
+	for (i = 0; i < ipc_priv->num_channels; i++)
+		free(ipc_priv->channels[i]);
+
+	ipc_priv->num_channels = 0;
+	reload_print("Entering func %s.... ipc_us_t num_channels=%d\n"
+		, __func__, ipc_priv->num_channels);
+}
+int fsl_ipc_reinit(fsl_ipc_t ipc)
+{
+
+	os_het_ipc_channel_t    *ipc_ch;
+	ipc_userspace_t         *ipc_priv;
+	int start_channel_id = 0, max_channel_id = MAX_IPC_CHANNELS;
+	int i = 0;
+	reload_print("Enter.... %s\n", __func__);
+	ENTER();
+	ipc_priv = (ipc_userspace_t *)ipc;
+
+
+	/* os_het_ipc_channel_t size 60 */
+	reload_print("dump_ipc_channel_ in %s\n", __func__);
+	for (i = start_channel_id ; i < max_channel_id; i++) {
+
+		ipc_ch = get_channel_vaddr(i, ipc_priv);
+
+		ipc_ch->producer_initialized = 0;
+
+		if (ipc_ch->id != 0)
+			ipc_ch->consumer_initialized = 0;
+
+		ipc_ch->tracker.consumer_num = 0;
+		ipc_ch->tracker.producer_num = 0;
+
+		if (ipc_ch->id != 0)
+			ipc_ch->bd_ring_size = 0;
+
+		ipc_ch->max_msg_size = 0;
+
+		if (ipc_ch->id != 0)
+			ipc_ch->ch_type = 0;
+		else
+			ipc_ch->ch_type = OS_HET_IPC_POINTER_CH;
+
+		ipc_ch->ipc_ind = OS_HET_NO_INT;
+		ipc_ch->ind_offset = 0;
+		ipc_ch->ind_value = 0;
+		ipc_ch->pa_reserved[0] = 0;
+		ipc_ch->pa_reserved[1] = 0;
+		ipc_ch->semaphore_pointer = NULL;
+#if DEBUG_RELOAD
+		dump_ipc_channel(ipc_ch);
+#endif
+}
+
+	/* os_het_control_t structure size 48*/
+	os_het_control_t *sh_ctrl =  ipc_priv->sh_ctrl_area.vaddr;
+	sh_ctrl->initialized.pa_initialized = 0;
+	sh_ctrl->initialized.sc_initialized = 0;
+
+	/* PA and SC shared control start address and size not initailized
+	memset(&sh_ctrl->pa_shared_mem, 0, sizeof(os_het_mem_t));
+	memset(&sh_ctrl->sc_shared_mem, 0, sizeof(os_het_mem_t));
+	*/
+
+	/* free user space stucture */
+	fsl_ipc_us_reinit(ipc);
+	/* will never fail */
+	return ERR_SUCCESS;
+}

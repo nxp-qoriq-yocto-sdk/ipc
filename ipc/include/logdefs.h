@@ -1,7 +1,7 @@
  /*
  *
- * Copyright (c) 2011
- *  Freescale Semiconductor Inc.  All rights reserved.
+ * Copyright (c) 2011-2013
+ *  Freescale Semiconductor Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,6 +28,7 @@
  * SUCH DAMAGE.
  *
  *      Author: Manish Jaggi <manish.jaggi@freescale.com>
+ *      Author: Ashish Kumar <ashish.kumar@freescale.com>
  */
 #ifndef LOGDEFS_H
 #define LOGDEFS_H
@@ -45,6 +46,12 @@
 #define debug_print(...)  printf(__VA_ARGS__);
 #else
 #define debug_print(...)
+#endif
+
+#ifdef DEBUG_RELOAD
+#define reload_print(...)  printf(__VA_ARGS__);
+#else
+#define reload_print(...)
 #endif
 
 

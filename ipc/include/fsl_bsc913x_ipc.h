@@ -395,4 +395,58 @@ int fsl_ipc_set_consumed_status(uint32_t channel_id, fsl_ipc_t ipc);
  ****************************************************************************/
 int fsl_ipc_chk_recv_status(uint64_t *bmask, fsl_ipc_t ipc);
 
+/**Re-Initialize IPC Channels**/
+/***************************************************************************
+ ** @fsl_ipc_reinit
+ **
+ ** Re initialize all IPC channels
+ **
+ ** ipc[in] . ipc handle returned by fsl_ipc_init
+ **
+ ** Return: On Success, zero is returned
+ ** On Failure, non-zero value is returned.
+ ***************************************************************************/
+int fsl_ipc_reinit(fsl_ipc_t ipc);
+
+/**Reloading DSP Image**/
+/*************************************************************************
+ ** @fsl_load_dsp_image
+ **
+ ** Loads DSP image
+ **
+ ** fname[in] . absolute path of DSP image to be loaded
+ **
+ ** Return: On Success, zero is returned
+ ** On Failure, non-zero value is returned.
+ **************************************************************************/
+int fsl_load_dsp_image(char *fname);
+
+/**Triggering VNMI**/
+/*************************************************************************
+ ** @fsl_send_vnmi
+ * *
+ * * Generate Virtual NMI towards DSP core
+ * *
+ * * Return: On Success, zero is returned
+ * *On Failure, non-zero value is returned.
+ * ***********************************************************************/
+int fsl_send_vnmi(void);
+
+/*************************************************************************
+ * * @fsl_restart_L1
+ * *
+ * *  Triggers the DSP Recovery and re-loads/start DSP image
+ * *
+ * * ipc[in] . IPC handle returned earlier by fsl_ipc_init
+ * * fname[in] . absolute path of DSP/L1 image to be re-loaded/started
+ * *
+ * * Return: On Success, zero is returned
+ * *                 On Failure, non-zero value is returned.
+ * *
+ * * Description
+ * * It re-initializes all IPC channels and then generates a VNMI towards DSP
+ * * so that DSP can perform recovery. It furthers re-loads and starts the
+ * * DSP/L1 image upon receiving `DSP Ready. indication from DSP.
+ * ************************************************************************/
+int fsl_restart_L1(fsl_ipc_t ipc, char *fname);
 #endif /* FSL_913x_IPC_H_ */
