@@ -22,12 +22,10 @@ mem_lib:
 #	$(AR) rcs libmem.a ./lib/fsl_usmmgr.o
 
 ipc_test:
-	$(CC) ./test/ipc_test_mrat.c $(CFLAGS) -L. -lipc -lmem -o ipc_test_mrat
-	$(CC) ./test/ipc_test67_mrat.c $(CFLAGS) -L. -lipc -lmem -o ipc_test67_mrat
 	$(CC) ./test/ipc_test.c $(CFLAGS) -L. -lipc -lmem -o ipc_test
 	$(CC) ./test/ipc_test67.c $(CFLAGS) -L. -lipc -lmem -o ipc_test67
 	$(CC) ./test/fsl_dump_memory.c $(CFLAGS) -L. -lipc -lmem -o dump_mem
 
 clean:
-	rm -rf dump_mem ipc_test ipc_test67 ipc_test_mrat ipc_test67_mrat ./lib/*.o *.a *.so
+	rm -rf dump_mem ipc_test ipc_test67 ./lib/*.o *.a *.so
 

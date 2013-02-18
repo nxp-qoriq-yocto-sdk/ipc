@@ -1,9 +1,11 @@
 /*
- * Copyright 2011-2012 Freescale Semiconductor, Inc.
+ * Copyright 2011-2013 Freescale Semiconductor, Inc.
  *
+ * Author: Ashish Kumar <ashish.kumar@freescale.com>
  * Author: Manish Jaggi <manish.jaggi@freescale.com>
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <unistd.h>
@@ -18,7 +20,8 @@
 fsl_usmmgr_t usmmgr;
 fsl_ipc_t ipc;
 int ch7init;
-void test_init();
+void test_init(int rat_id);
+int rat_id;
 
 /* Logging Function */
 void dump_msg(char *msg, int len)
@@ -30,12 +33,24 @@ void dump_msg(char *msg, int len)
 	printf("\n");
 }
 
-int main()
+int main(int argc, char **argv)
 {
-	test_init();
+	if (argc > 2) {
+		printf("Usage:\n %s <rat_id>\n", argv[0]);
+		printf("OR \nUsage:\n %s\n", argv[0]);
+		goto end;
+	}
+	if (argc == 1)
+		rat_id = 0;
+	else if (argc == 2)
+		rat_id = atoi(argv[1]);
 
+	test_init(rat_id);
+end:
 	return 0;
+
 }
+
 
 int isbitset(uint64_t v, int bit)
 {
@@ -57,13 +72,16 @@ void channel67_thread(void *ptr)
 	void *vaddr;
 	int first = 1;
 	char fapi_msg[1020];
+
 	ENTER();
+
 	ret = fsl_ipc_configure_channel(7, depth, IPC_PTR_CH, 0, 0, NULL, ipc);
 	if (ret) {
 		printf("\n ret %d \n", ret);
 		EXIT(ret);
 		pthread_exit(0);
 	}
+
 	ch7init = 1;
 
 	r.size = 0x200000;
@@ -95,7 +113,7 @@ void channel67_thread(void *ptr)
 			goto end;
 		}
 
-		memset(vaddr, 0x11 + ctr, 1024);
+		memset(vaddr, 0x11 + rat_id + ctr, 1024);
 
 		lst.entry[1].src_addr = r.phys_addr + 1024 * 16;
 		lst.entry[1].len = 1024;
@@ -108,26 +126,28 @@ void channel67_thread(void *ptr)
 			goto end;
 		}
 
-		memset(vaddr, 0x22 + ctr, 1024);
+		memset(vaddr, 0x22 + rat_id + ctr, 1024);
 
 		lst.entry[2].is_valid = 0;
 		/* vaddr = fsl_usmmgr_p2v(lst.entry[1].src_addr, usmmgr); */
-		memset(fapi_msg, ctr, 1020);
+		memset(fapi_msg, rat_id + ctr, 1020);
 		do {
 			if (!first)
 				while (fsl_ipc_get_last_tx_req_status(ipc)
 				       != TXREQ_DONE) {
-					printf("*");
+						usleep(10000);
+						printf(",");
 				}
 			ret =
 			    fsl_ipc_send_tx_req(6, &lst, &fapi_msg, 1020, ipc);
+			    usleep(10000);
 			first = 0;
 		} while (ret == -ERR_CHANNEL_FULL);
 		if (ret) {
 			printf("\n ERROR ret %x \n", ret);
 			goto end;
 		}
-		printf("\nS:C6:TXREQ\n");
+		printf("\n[IPC_PA %d]S:C6:TXREQ ctr=%d\n", rat_id, ctr);
 
 		do {
 			ret = fsl_ipc_recv_ptr(7, &p, &len, ipc);
@@ -138,6 +158,7 @@ void channel67_thread(void *ptr)
 			goto end;
 		}
 		printf("\nR:C7:P:[%lx]L:%x\n", p, len);
+
 		ctr++;
 	}
 end:
@@ -151,7 +172,7 @@ void *test_p2v(phys_addr_t phys_addr)
 	return fsl_usmmgr_p2v(phys_addr, usmmgr);
 }
 
-void test_init()
+void test_init(int rat_id)
 {
 	int ret = 0;
 	int ret3;
@@ -189,7 +210,17 @@ void test_init()
 		return;
 	}
 
-	ipc = fsl_ipc_init(test_p2v, sh_ctrl, dsp_ccsr, pa_ccsr);
+	if (rat_id == 0) {
+		/* use of fsl_ipc_init is deprecated
+		* Instead use fsl_ipc_init_rat with rat_id 0,
+		* for non-MULTI RAT scenarios*/
+		ipc = fsl_ipc_init(
+			test_p2v, sh_ctrl, dsp_ccsr, pa_ccsr);
+	} else {
+		ipc = fsl_ipc_init_rat(
+			rat_id,
+			test_p2v, sh_ctrl, dsp_ccsr, pa_ccsr);
+	}
 
 	if (!ipc) {
 		printf("Issue with fsl_ipc_init %d\n", ret);

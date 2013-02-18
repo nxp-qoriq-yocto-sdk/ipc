@@ -1,9 +1,11 @@
 /*
- * Copyright 2011-2012 Freescale Semiconductor, Inc.
+ * Copyright 2011-2013 Freescale Semiconductor, Inc.
  *
+ * Author: Ashish Kumar <ashish.kumar@freescale.com>
  * Author: Manish Jaggi <manish.jaggi@freescale.com>
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <unistd.h>
@@ -19,7 +21,8 @@ fsl_usmmgr_t usmmgr;
 fsl_ipc_t ipc;
 int ch3init;
 int ch4init;
-void test_init();
+void test_init(int rat_id);
+int rat_id;
 
 /* Logging Function */
 void dump_msg(char *msg, int len)
@@ -31,10 +34,20 @@ void dump_msg(char *msg, int len)
 	printf("\n");
 }
 
-int main()
+int main(int argc, char **argv)
 {
-	test_init();
+	if (argc > 2) {
+		printf("Usage:\n %s <rat_id>\n", argv[0]);
+		printf("OR \nUsage:\n %s\n", argv[0]);
+		goto end;
+	}
+	if (argc == 1)
+		rat_id = 0;
+	else if (argc == 2)
+		rat_id = atoi(argv[1]);
 
+	test_init(rat_id);
+end:
 	return 0;
 }
 
@@ -69,20 +82,21 @@ void channel3_thread(void *ptr)
 			usleep(1000);
 		} while (ret == -ERR_CHANNEL_EMPTY);
 		if (ret) {
+			ENTER();
 			printf("\n ERROR ret %x \n", ret);
 			goto end;
 		}
-		printf("\nR:C3:P:[%lx]L:%x\n", p, len);
+		printf("\n[IPC_PA%d] R:C3:P:[%lx]L:%x\n", rat_id, p, len);
 
-		sprintf(bs, "MSG #%x", ctr++);
+		sprintf(bs, "%x ", ctr++);
 		do {
-			ret = fsl_ipc_send_msg(2, bs, 15, ipc);
+			ret = fsl_ipc_send_msg(2, bs, 9, ipc);
 		} while (ret == -ERR_CHANNEL_FULL);
 		if (ret) {
 			printf("\n ret %x \n", ret);
 			goto end;
 		}
-		printf("\nS:C2:M:L:%x\n", 15);
+		printf("\n[IPC_PA%d] S:C2:M:L:%x\n", rat_id, 9);
 	}
 end:
 	printf("Exiting thread for ch2/3\n");
@@ -146,7 +160,7 @@ void *test_p2v(phys_addr_t phys_addr)
 	return fsl_usmmgr_p2v(phys_addr, usmmgr);
 }
 
-void test_init()
+void test_init(int rat_id)
 {
 	uint64_t bmask;
 	int ret = 0;
@@ -185,7 +199,17 @@ void test_init()
 		return;
 	}
 
-	ipc = fsl_ipc_init(test_p2v, sh_ctrl, dsp_ccsr, pa_ccsr);
+	if (rat_id == 0) {
+		/* use of fsl_ipc_init is deprecated
+		* Instead use fsl_ipc_init_rat with rat_id 0,
+		* for non-MULTI RAT scenarios*/
+		ipc = fsl_ipc_init(
+			test_p2v, sh_ctrl, dsp_ccsr, pa_ccsr);
+	} else {
+		ipc = fsl_ipc_init_rat(
+			rat_id,
+			test_p2v, sh_ctrl, dsp_ccsr, pa_ccsr);
+	}
 
 	if (!ipc) {
 		printf("Issue with fsl_ipc_init %d\n", ret);
@@ -224,7 +248,7 @@ void test_init()
 	if (ret)
 		printf("Issue with fsl_ipc_send_msg %d\n", ret);
 
-	printf("\nS:C2:M:L:%x\n", 10);
+	printf("\n[IPC_PA] S:C2:M:L:%x\n", 10);
 	pthread_join(thread1, NULL);
 	pthread_join(thread2, NULL);
 	EXIT(0);
