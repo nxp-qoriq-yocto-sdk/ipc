@@ -26,8 +26,9 @@ mem_lib:
 ipc_test:
 	$(CC) ./test/ipc_test.c $(CFLAGS) -L. -lipc -lmem -o ipc_test
 	$(CC) ./test/ipc_test67.c $(CFLAGS) -L. -lipc -lmem -o ipc_test67
+	$(CC) ./test/dsp_recover.c $(CFLAGS) -L. -lipc -lmem -o dsp_recover
 	$(CC) ./test/fsl_dump_memory.c $(CFLAGS) -L. -lipc -lmem -o dump_mem
 
 clean:
-	rm -rf dump_mem ipc_test ipc_test67 ./lib/*.o *.a *.so
+	rm -rf dump_mem ipc_test ipc_test67 dsp_recover ./lib/*.o *.a *.so
 
