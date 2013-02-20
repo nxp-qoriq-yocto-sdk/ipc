@@ -34,8 +34,9 @@ Compilation Procedure
 3. run make
 4. libipc.so, libmem.so, ipc_test,
 	      ipc_test67, dump_mem - gets created under ipc directory ,
-			    dsp_bt - gets created under
-				     dsp_boot directory
+	      libdspboot.so copied from dsp_boot directory
+	      dsp_bt, libdspboot.so - gets created under
+			     dsp_boot directory
 5. For enabling access of IPC channel by multiple application, pass "CONFIG_LOCK=1"
 flag as an argument to make as follows:
      make CONFIG_LOCK=1
@@ -52,8 +53,8 @@ max_channel_depth=16
 Test Application (Single RAT only Solutions)
 ----------------
 Test applications (ipc_test, ipc_test67) can be started once the DSP image
-(ipc_913x_dbg_0.5.bin, present in rootfs under /DSP_images) is loaded
-sucessfully by dsp_bt application.
+(ipc_9132_multimode_dbg.bin/ipc_9131_dbg.bin), present in rootfs under
+/dsp_images is loaded sucessfully by dsp_bt application.
 
 Test runs with 6 channels, where for each pair of channels PowerPC is producer
 and DSP is consumer. For each of the channel pairs a seperate thread is
@@ -93,30 +94,28 @@ $./ipc_test67
 
 Test Application (Multi RAT)
 ----------------
-ipc_test_mrat and ipc_test67_mrat is added for testing multirat support from PA side.
-To test multi rat without actual dsp image ipc_test_dsp_stub is provided.
+ipc_test and ipc_test67 are upgraded for testing multirat support from PA side.
+rat id should be added after the executable name
 
-ipc_test_mrat
-	is same as ipc_test but with an addition that at the time of execution
-	a command line argument can be provided as the rat_id.
-	
-	for eg: 
+Format
+------
+  ./ipc_test <rat_id>
+  ./ipc_test <0/1>
+OR
+  ./ipc_test
 
-		ipc_test_mrat 0 would run the test for rat_id 0 
-		ipc_test_mrat 1 would run the test for rat_id 1
+For channel 2-3,4-5
+$./ipc_test 1
 
-ipc_test67_mrat
-	is same as ipc_test67 but with an addition that rat_id can be specified
-	Also channel 7 operation is not there.
+For Channel 6-7
+$./ipc_test67 1
 
-ipc_test_dsp_stub
-	This application is added to test MultiRAT without DSP. This can be used with 
-	ipc_test_mrat and ipc_test67_mrat.
-	This application also takes rat_id as input paramter.
+        for eg:
+                ipc_test or ipc_test 0 would run the test for rat_id 0
+                ipc_test 1 would run the test for rat_id 1
 
-	Note: It should be executed before any pa tests.
-
-
+Note: DSP multi rat enabled binary(ipc_9132_multimode_dbg.bin) must be loaded before
+any pa tests.
 
 Memory Dump
 -----------
@@ -144,3 +143,39 @@ dump_memory_dsp status is (768) 0x300
   0f000000  1f000000  01000000  3700002c
   00000000  37000038  37000050  00000040
   00000010  370000e8  b0022d64  00000960
+
+DSP Recovery
+------------
+There is no need to rebot the system completely if some problem occurs at DSP
+side. Now it is possible for L2 to initiate the DSP recovery. Following BSP API
+is available for L2 for performing DSP Recovery:
+
+/*************************************************************************
+ * * @fsl_restart_L1
+ * *
+ * *  Triggers the DSP Recovery and re-loads/start DSP image
+ * *
+ * * ipc[in] . IPC handle returned by fsl_ipc_init
+ * * fname[in] . absolute path of DSP/L1 image to be re-loaded
+ * *
+ * * Return: On Success, zero is returned
+ * *                 On Failure, non-zero value is returned.
+ * *
+ * * Description
+ * * It re-initializes all IPC channels and then generates a VNMI towards DSP
+ * * so that DSP can perform recovery. It furthers re-loads and starts the
+ * * DSP/L1 image upon receiving `DSP Ready. indication from DSP.
+ * ************************************************************************/
+int fsl_restart_L1(fsl_ipc_t ipc, char *fname);
+
+DSP Recovery Test Applicationi:
+
+Format
+------
+ ./dsp_recover <rat_id>
+ ./dsp_recover <0/1>
+OR
+ ./dsp_recover
+
+  dsp_recover or dsp_recover 0 would run the test for Non-Multi RAT L1
+  dsp_recover 1 would run the test for Multi RAT enabled L1
