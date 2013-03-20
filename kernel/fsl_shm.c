@@ -622,8 +622,13 @@ static int fsl_shm_get_paddr(shm_seg_t *mem)
 	return 0;
 }
 
+#ifdef HAVE_UNLOCKED_IOCTL
 static long fsl_shm_ioctl(struct file *file, unsigned int cmd,
 		unsigned long arg)
+#else
+static int fsl_shm_ioctl(struct inode *inode, struct file *file,
+		unsigned int cmd, unsigned long arg)
+#endif
 {
 	shm_seg_t seg;
 	alloc_req_t mem;
@@ -698,7 +703,11 @@ static long fsl_shm_ioctl(struct file *file, unsigned int cmd,
 
 static const struct file_operations fsl_shm_fops = {
 	.owner = THIS_MODULE,
+#ifdef HAVE_UNLOCKED_IOCTL
 	.unlocked_ioctl = fsl_shm_ioctl,
+#else
+	.ioctl = fsl_shm_ioctl,
+#endif
 };
 
 static __init int fsl_shm_init(void)
