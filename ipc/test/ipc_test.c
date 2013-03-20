@@ -62,7 +62,7 @@ int isbitset(uint64_t v, int bit)
 
 void channel3_thread(void *ptr)
 {
-	phys_addr_t p;
+	unsigned long p;
 	uint32_t len;
 	int ret;
 	int ctr = 0;
@@ -105,7 +105,7 @@ end:
 }
 void channel4_thread(void *ptr)
 {
-	phys_addr_t p;
+	unsigned long p;
 	uint32_t len;
 	int ret;
 	int depth = 16;
@@ -155,7 +155,7 @@ end:
 	pthread_exit(0);
 }
 
-void *test_p2v(phys_addr_t phys_addr)
+void *test_p2v(unsigned long phys_addr)
 {
 	return fsl_usmmgr_p2v(phys_addr, usmmgr);
 }
@@ -167,9 +167,9 @@ void test_init(int rat_id)
 	int ret1, ret2;
 	char *buf = "Hello DSP.";
 	pthread_t thread1, thread2;
-	range_t sh_ctrl;
-	range_t dsp_ccsr;
-	range_t pa_ccsr;
+	mem_range_t sh_ctrl;
+	mem_range_t dsp_ccsr;
+	mem_range_t pa_ccsr;
 
 	ENTER();
 	printf("\n=========$IPC TEST$====%s %s====\n", __DATE__, __TIME__);

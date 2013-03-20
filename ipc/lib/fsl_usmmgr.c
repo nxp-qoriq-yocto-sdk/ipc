@@ -13,14 +13,13 @@
 #include <unistd.h>
 #include <string.h>
 #include <signal.h>
-#include "logdefs.h"
-#include "fsl_types.h"
+#include "fsl_ipc_types.h"
 #include "fsl_het_mgr.h"
 #include "fsl_usmmgr.h"
 #include "fsl_ipc_shm.h"
 #include "logdefs.h"
 #include "fsl_ipc_errorcodes.h"
-#include "bsc913x_heterogeneous.h"
+#include "fsl_heterogeneous.h"
 #include "fsl_ipc_lock.h"
 
 #define BSC9132_MODEL_STR	"fsl,bsc9132"
@@ -54,17 +53,17 @@ typedef struct {
 	int dev_mem;
 	int shmid;
 
-	range_t	map[MAX_MAP_NUM];
+	mem_range_t	map[MAX_MAP_NUM];
 	sys_map_t het_sys_map;
-	range_t	shared_area;
-	range_t dsp_ccsr;
-	range_t pa_ccsr;
+	mem_range_t	shared_area;
+	mem_range_t dsp_ccsr;
+	mem_range_t pa_ccsr;
 } usmmgr_priv;
 
 void cleanup(usmmgr_priv *priv);
 /* */
 
-int fsl_usmmgr_alloc(range_t *r, fsl_usmmgr_t usmmgr)
+int fsl_usmmgr_alloc(mem_range_t *r, fsl_usmmgr_t usmmgr)
 {
 	if (!r->size)
 		return -1;
@@ -73,12 +72,13 @@ int fsl_usmmgr_alloc(range_t *r, fsl_usmmgr_t usmmgr)
 	if (!r->vaddr)
 		return -1;
 
-	r->phys_addr = (phys_addr_t)shm_vtop(r->vaddr);
+	r->phys_addr = (unsigned long)shm_vtop(r->vaddr);
 
 	return 0;
 }
 
-int fsl_usmmgr_memalign(range_t *r, unsigned long align, fsl_usmmgr_t usmmgr)
+int fsl_usmmgr_memalign(mem_range_t *r, unsigned long align,
+		fsl_usmmgr_t usmmgr)
 {
 	if (!r->size)
 		return -1;
@@ -87,12 +87,12 @@ int fsl_usmmgr_memalign(range_t *r, unsigned long align, fsl_usmmgr_t usmmgr)
 	if (!r->vaddr)
 		return -1;
 
-	r->phys_addr = (phys_addr_t)shm_vtop(r->vaddr);
+	r->phys_addr = (unsigned long)shm_vtop(r->vaddr);
 
 	return 0;
 }
 
-void fsl_usmmgr_free(range_t *r, fsl_usmmgr_t usmmgr)
+void fsl_usmmgr_free(mem_range_t *r, fsl_usmmgr_t usmmgr)
 {
 	shm_free(r->vaddr);
 }
@@ -276,10 +276,10 @@ fsl_usmmgr_t fsl_usmmgr_init(void)
 	priv->dev_het_mgr = 0;
 	priv->dev_mem = 0;
 
-	memset(&priv->shared_area, 0, sizeof(range_t));
-	memset(&priv->dsp_ccsr, 0, sizeof(range_t));
-	memset(&priv->pa_ccsr, 0, sizeof(range_t));
-	memset(priv->map, 0, MAX_MAP_NUM*sizeof(range_t));
+	memset(&priv->shared_area, 0, sizeof(mem_range_t));
+	memset(&priv->dsp_ccsr, 0, sizeof(mem_range_t));
+	memset(&priv->pa_ccsr, 0, sizeof(mem_range_t));
+	memset(priv->map, 0, MAX_MAP_NUM*sizeof(mem_range_t));
 	memset(&priv->het_sys_map, 0, sizeof(sys_map_t));
 
 	ptr_ret = fsl_shm_init(0);
@@ -320,7 +320,7 @@ int fsl_usmmgr_exit(fsl_usmmgr_t usmmgr)
 	return rc;
 }
 
-int get_shared_ctrl_area(range_t *r, fsl_usmmgr_t usmmgr)
+int get_shared_ctrl_area(mem_range_t *r, fsl_usmmgr_t usmmgr)
 {
 	int ret = ERR_SUCCESS;
 	ENTER();
@@ -340,17 +340,17 @@ int get_shared_ctrl_area(range_t *r, fsl_usmmgr_t usmmgr)
 			return -1;
 		}
 
-		memcpy(&priv->shared_area, r, sizeof(range_t));
+		memcpy(&priv->shared_area, r, sizeof(mem_range_t));
 		DUMPR(&priv->shared_area);
 	} else
-		memcpy(r, &priv->shared_area, sizeof(range_t));
+		memcpy(r, &priv->shared_area, sizeof(mem_range_t));
 
 	DUMPR(r);
 	EXIT(ret);
 	return ret;
 }
 
-int get_dsp_ccsr_area(range_t *r, fsl_usmmgr_t usmmgr)
+int get_dsp_ccsr_area(mem_range_t *r, fsl_usmmgr_t usmmgr)
 {
 	int ret = ERR_SUCCESS;
 	ENTER();
@@ -370,15 +370,15 @@ int get_dsp_ccsr_area(range_t *r, fsl_usmmgr_t usmmgr)
 			return -1;
 		}
 
-		memcpy(&priv->dsp_ccsr, r, sizeof(range_t));
+		memcpy(&priv->dsp_ccsr, r, sizeof(mem_range_t));
 	} else
-		memcpy(r, &priv->dsp_ccsr, sizeof(range_t));
+		memcpy(r, &priv->dsp_ccsr, sizeof(mem_range_t));
 
 	EXIT(ret);
 	return ret;
 }
 
-int get_pa_ccsr_area(range_t *r, fsl_usmmgr_t usmmgr)
+int get_pa_ccsr_area(mem_range_t *r, fsl_usmmgr_t usmmgr)
 {
 	int ret = ERR_SUCCESS;
 	ENTER();
@@ -398,24 +398,24 @@ int get_pa_ccsr_area(range_t *r, fsl_usmmgr_t usmmgr)
 			return -1;
 		}
 
-		memcpy(&priv->pa_ccsr, r, sizeof(range_t));
+		memcpy(&priv->pa_ccsr, r, sizeof(mem_range_t));
 	} else
-		memcpy(r, &priv->pa_ccsr, sizeof(range_t));
+		memcpy(r, &priv->pa_ccsr, sizeof(mem_range_t));
 
 	EXIT(ret);
 	return ret;
 }
 
-phys_addr_t fsl_usmmgr_v2p(void *vaddr, fsl_usmmgr_t usmmgr)
+unsigned long fsl_usmmgr_v2p(void *vaddr, fsl_usmmgr_t usmmgr)
 {
-	phys_addr_t paddr;
+	unsigned long paddr;
 
-	paddr = (phys_addr_t)shm_vtop(vaddr);
+	paddr = (unsigned long)shm_vtop(vaddr);
 
 	return paddr;
 }
 
-void *fsl_usmmgr_p2v(phys_addr_t phys_addr, fsl_usmmgr_t usmmgr)
+void *fsl_usmmgr_p2v(unsigned long phys_addr, fsl_usmmgr_t usmmgr)
 {
 	int i;
 	void *vaddr = NULL;

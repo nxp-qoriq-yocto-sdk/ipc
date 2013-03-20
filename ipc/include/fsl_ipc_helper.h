@@ -32,7 +32,7 @@
  */
 #ifndef IPC_HELPER_H
 #define IPC_HELPER_H
-#include "fsl_types.h"
+#include "fsl_ipc_types.h"
 
 /*****************************************************************************
  * @fsl_ipc_helper_init

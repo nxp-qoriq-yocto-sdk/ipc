@@ -20,7 +20,7 @@
 #include <stdint.h>
 #include <time.h>
 #include "fsl_het_mgr.h"
-#include "fsl_types.h"
+#include "fsl_ipc_types.h"
 #include "fsl_ipc_shm.h"
 #include "bsc913x_dsp_boot.h"
 
@@ -68,7 +68,7 @@ void cleanup(int, int);
  *
  */
 
-static range_t map[MAX_ENTRIES];
+static mem_range_t map[MAX_ENTRIES];
 static int mapidx;
 
 void dump_sys_map(sys_map_t het_sys_map)
@@ -103,13 +103,13 @@ void dump_sys_map(sys_map_t het_sys_map)
 		het_sys_map.dsp_ccsrbar.size);
 }
 
-void *map_area(phys_addr_t phys_addr, unsigned int  *sz, int dev_mem)
+void *map_area(unsigned long phys_addr, unsigned int  *sz, int dev_mem)
 {
 	int i;
 	void *vaddr = NULL;;
 	uint32_t diff;
 	int size = *sz;
-	phys_addr_t nphys_addr;
+	unsigned long nphys_addr;
 	nphys_addr = phys_addr & 0xfffff000;
 	if (phys_addr + size > nphys_addr + 0x1000)
 		size = (size + 0x1000) & 0xfffff000;
@@ -377,7 +377,7 @@ static inline int dsp_ready_set(sys_map_t *het_sys_map, int dev_mem)
 	ret = 0;
 	uint32_t tsize = 4;
 
-	phys_addr_t phys_addr = (*het_sys_map).pa_ccsrbar.phys_addr + DSPSR;
+	unsigned long phys_addr = (*het_sys_map).pa_ccsrbar.phys_addr + DSPSR;
 	reload_print("\%s physical address %lx to virtual address\n",
 			__func__, phys_addr);
 	vaddr = map_area(phys_addr, &tsize, dev_mem);
@@ -409,7 +409,7 @@ static int set_ppc_ready(sys_map_t *het_sys_map, int dev_mem)
 	volatile uint32_t *vaddr;
 	uint32_t tsize = 4;
 	/* write to ppc ready */
-	phys_addr_t phys_addr = (*het_sys_map).dsp_ccsrbar.phys_addr + DSP_GCR
+	unsigned long phys_addr = (*het_sys_map).dsp_ccsrbar.phys_addr + DSP_GCR
 				+ PASTATE;
 	vaddr = map_area(phys_addr, &tsize, dev_mem);
 	reload_print("%s: physical address %lx to virtual address\n",
@@ -435,7 +435,8 @@ static int reset_ppc_ready(sys_map_t *het_sys_map, int dev_mem)
 		 *vaddr_dspstate;
 	int size = 0x1000;
 
-	phys_addr_t phys_addr = (*het_sys_map).dsp_ccsrbar.phys_addr + DSP_GCR;
+	unsigned long phys_addr = (*het_sys_map).dsp_ccsrbar.phys_addr +
+		DSP_GCR;
 	reload_print("het_sys_map.dsp_ccsrbar.phys_addr %x DSP_GCR%x\n",
 		(uint32_t)(*het_sys_map).dsp_ccsrbar.phys_addr,
 		DSP_GCR);
@@ -481,7 +482,8 @@ int send_vnmi_func(sys_map_t *het_sys_map, int dev_mem, int dev_het_mgr)
 	reload_print("Entering func %s\n", __func__);
 	volatile void *vaddr;
 	int size = 0x8;
-	phys_addr_t phys_addr = (*het_sys_map).dsp_ccsrbar.phys_addr + GIC_VIGR;
+	unsigned long phys_addr = (*het_sys_map).dsp_ccsrbar.phys_addr +
+		GIC_VIGR;
 
 	reload_print("het_sys_map.dsp_ccsrbar.phys_addr %x GIC_VIGR%x\n",
 		(uint32_t)(*het_sys_map).dsp_ccsrbar.phys_addr,

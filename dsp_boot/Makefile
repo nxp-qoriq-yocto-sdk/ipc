@@ -1,5 +1,6 @@
 CC=$(CROSS_COMPILE)gcc
-HET_DIR=$(KERNEL_DIR)/drivers/misc
+KERNEL_DIR1=$(PWD)/kernel
+HET_DIR=$(KERNEL_DIR1)
 FSL_SHM_DIR=../fsl_shm/include
 SOURCES= ./dsp_boot.c
 SOURCES_FSL_SHM= ../fsl_shm/lib/lg_shm.c

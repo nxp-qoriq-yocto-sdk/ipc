@@ -12,7 +12,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include "logdefs.h"
-#include "fsl_types.h"
+#include "fsl_ipc_types.h"
 #include "fsl_het_mgr.h"
 #include "fsl_ipc_errorcodes.h"
 #include "bsc913x_heterogeneous.h"

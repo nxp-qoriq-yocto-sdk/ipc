@@ -94,9 +94,9 @@ typedef struct {
 *****************************************************************************/
 typedef struct {
 	uint32_t sattr;
-	phys_addr_t src;
+	unsigned long src;
 	uint32_t dattr;
-	phys_addr_t dest;
+	unsigned long dest;
 	uint32_t enlndar;
 	uint32_t nlndar;
 	uint32_t length;
@@ -110,11 +110,11 @@ typedef struct {
 typedef struct {
 	volatile dma_regs_t *dma;
 	int list_index;
-	range_t dma_list_mem;
+	mem_range_t dma_list_mem;
 	dma_list_t *dma_list;
 } uspace_dma_t;
 
-fsl_udma_t fsl_uspace_dma_init(range_t dma_list_mem, range_t pa_ccsr,
+fsl_udma_t fsl_uspace_dma_init(mem_range_t dma_list_mem, mem_range_t pa_ccsr,
 			uint32_t dma_ch_id)
 {
 	void *dma;
@@ -135,7 +135,7 @@ fsl_udma_t fsl_uspace_dma_init(range_t dma_list_mem, range_t pa_ccsr,
 	dma_priv->dma->clndar = dma_list_mem.phys_addr;
 	debug_print("Setting dma_priv->dma->clndar = %x\n",
 		    dma_list_mem.phys_addr);
-	memcpy(&dma_priv->dma_list_mem, &dma_list_mem, sizeof(range_t));
+	memcpy(&dma_priv->dma_list_mem, &dma_list_mem, sizeof(mem_range_t));
 	debug_print("Setting dma_priv->dma->clndar = %x\n",
 		    dma_priv->dma_list_mem.phys_addr);
 end:
@@ -150,8 +150,8 @@ void fsl_uspace_dma_exit(fsl_udma_t udma)
 		free(dma_priv);
 }
 
-int fsl_uspace_dma_add_entry(phys_addr_t src, phys_addr_t dest, uint32_t length,
-			     fsl_udma_t udma)
+int fsl_uspace_dma_add_entry(unsigned long src, unsigned long dest,
+		uint32_t length, fsl_udma_t udma)
 {
 	void *dma_curr;
 	ENTER();

@@ -31,7 +31,7 @@
  */
 #ifndef IPC_HELPER_H
 #define IPC_HELPER_H
-#include "fsl_types.h"
+#include "fsl_ipc_types.h"
 #include "fsl_ipc_shm.h"
 
 typedef void *fsl_usmmgr_t;
@@ -50,7 +50,7 @@ typedef void *fsl_usmmgr_t;
  * Return: On Sucess, zero is returned
  *          On Failure, less than zero is returned.
 *****************************************************************************/
-int fsl_usmmgr_alloc(range_t *r, fsl_usmmgr_t usmmgr);
+int fsl_usmmgr_alloc(mem_range_t *r, fsl_usmmgr_t usmmgr);
 
 /*****************************************************************************
  * @fsl_usmmgr_memalign
@@ -67,7 +67,8 @@ int fsl_usmmgr_alloc(range_t *r, fsl_usmmgr_t usmmgr);
  * Return: On Sucess, zero is returned
  *          On Failure, less than zero is returned.
 *****************************************************************************/
-int fsl_usmmgr_memalign(range_t *r, unsigned long align, fsl_usmmgr_t usmmgr);
+int fsl_usmmgr_memalign(mem_range_t *r, unsigned long align,
+		fsl_usmmgr_t usmmgr);
 
 /*****************************************************************************
  * @fsl_usmmgr_free
@@ -80,7 +81,7 @@ int fsl_usmmgr_memalign(range_t *r, unsigned long align, fsl_usmmgr_t usmmgr);
  * usmmgr - handle returned by fsl_usmmgr_init.
  *
 *****************************************************************************/
-void fsl_usmmgr_free(range_t *r, fsl_usmmgr_t usmmgr);
+void fsl_usmmgr_free(mem_range_t *r, fsl_usmmgr_t usmmgr);
 
 /*****************************************************************************
  * @fsl_usmmgr_init
@@ -116,7 +117,7 @@ int fsl_usmmgr_exit(fsl_usmmgr_t usmmgr);
  * usmmgr - handle returned by fsl_usmmgr_init.
  *
 *****************************************************************************/
-void *fsl_usmmgr_p2v(phys_addr_t, fsl_usmmgr_t usmmgr);
+void *fsl_usmmgr_p2v(unsigned long, fsl_usmmgr_t usmmgr);
 
 /*****************************************************************************
  * @fsl_usmmgr_v2p
@@ -130,7 +131,7 @@ void *fsl_usmmgr_p2v(phys_addr_t, fsl_usmmgr_t usmmgr);
  *         On Failure, zero value is returned.
  *
 ******************************************************************************/
-phys_addr_t fsl_usmmgr_v2p(void *vaddr, fsl_usmmgr_t usmmgr);
+unsigned long fsl_usmmgr_v2p(void *vaddr, fsl_usmmgr_t usmmgr);
 
 /*****************************************************************************
  * @get_pa_shared_area
@@ -142,12 +143,12 @@ phys_addr_t fsl_usmmgr_v2p(void *vaddr, fsl_usmmgr_t usmmgr);
  * Return Value:
  *	ERR_SUCCESS as pass, non zero value as failure
 *****************************************************************************/
-int get_pa_shared_area(range_t *r, fsl_usmmgr_t usmmgr);
+int get_pa_shared_area(mem_range_t *r, fsl_usmmgr_t usmmgr);
 
 /*****************************************************************************
  * @get_pa_ccsr_area
  *
- * Returns the range_t for pa_ccsr area
+ * Returns the mem_range_t for pa_ccsr area
  *
  * r	[out] parameter in which the range is returned
  *
@@ -156,12 +157,12 @@ int get_pa_shared_area(range_t *r, fsl_usmmgr_t usmmgr);
  * Return Value:
  *	ERR_SUCCESS as pass, non zero value as failure
 *****************************************************************************/
-int get_pa_ccsr_area(range_t *r, fsl_usmmgr_t usmmgr);
+int get_pa_ccsr_area(mem_range_t *r, fsl_usmmgr_t usmmgr);
 
 /*****************************************************************************
  * @get_dsp_ccsr_area
  *
- * Returns the range_t for dsp_ccsr area
+ * Returns the mem_range_t for dsp_ccsr area
  *
  * r	[out] parameter in which the range is returned
  *
@@ -170,12 +171,12 @@ int get_pa_ccsr_area(range_t *r, fsl_usmmgr_t usmmgr);
  * Return Value:
  *	ERR_SUCCESS as pass, non zero value as failure
 *****************************************************************************/
-int get_dsp_ccsr_area(range_t *r, fsl_usmmgr_t usmmgr);
+int get_dsp_ccsr_area(mem_range_t *r, fsl_usmmgr_t usmmgr);
 
 /*****************************************************************************
  * @get_shared_ctrl_area
  *
- * Returns the range_t for the shared control area
+ * Returns the mem_range_t for the shared control area
  *
  * r	[out] parameter in which the range is returned
  *
@@ -184,7 +185,7 @@ int get_dsp_ccsr_area(range_t *r, fsl_usmmgr_t usmmgr);
  * Return Value:
  *	ERR_SUCCESS as pass, non zero value as failure
 *****************************************************************************/
-int get_shared_ctrl_area(range_t *r, fsl_usmmgr_t usmmgr);
+int get_shared_ctrl_area(mem_range_t *r, fsl_usmmgr_t usmmgr);
 
 /***************************************************************************
  * @fsl_usmmgr_dump_memory

@@ -36,7 +36,7 @@
 #define _FSL_USER_DMA_H
 
 #include <stdint.h>
-#include "fsl_types.h"
+#include "fsl_ipc_types.h"
 typedef void *fsl_udma_t;
 /*****************************************************************************
  * @fsl_uspace_dma_init
@@ -48,7 +48,7 @@ typedef void *fsl_udma_t;
  *			of the reserved memory is provided with dma_list_mem
  *
 *****************************************************************************/
-fsl_udma_t fsl_uspace_dma_init(range_t dma_list_mem, range_t pa_ccsr,
+fsl_udma_t fsl_uspace_dma_init(mem_range_t dma_list_mem, mem_range_t pa_ccsr,
 		uint32_t dma_ch_id);
 /*****************************************************************************
  * @fsl_uspace_dma_add_entry
@@ -62,7 +62,7 @@ fsl_udma_t fsl_uspace_dma_init(range_t dma_list_mem, range_t pa_ccsr,
  * length	- 	length of the src buffer
  *
 *****************************************************************************/
-int fsl_uspace_dma_add_entry(phys_addr_t src, phys_addr_t dest,
+int fsl_uspace_dma_add_entry(unsigned long src, unsigned long dest,
 				uint32_t length, fsl_udma_t udma);
 /*****************************************************************************
  * @fsl_uspace_dma_start

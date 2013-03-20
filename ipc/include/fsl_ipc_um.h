@@ -10,10 +10,10 @@
 #ifndef FSL_IPC_UM_H_
 #define FSL_IPC_UM_H_
 
-#include "fsl_types.h"
+#include "fsl_ipc_types.h"
 #include "fsl_user_dma.h"
 #include "fsl_bsc913x_ipc.h"
-#include "bsc913x_heterogeneous_ipc.h"
+#include "fsl_heterogeneous_ipc.h"
 #define MAX_CHANNELS 64
 
 typedef struct {
@@ -43,9 +43,9 @@ typedef struct {
 	uint32_t	max_depth;
 	uint32_t	max_channels;
 
-	range_t		sh_ctrl_area;
-	range_t		dsp_ccsr;
-	range_t		pa_ccsr;
+	mem_range_t		sh_ctrl_area;
+	mem_range_t		dsp_ccsr;
+	mem_range_t		pa_ccsr;
 
 	fsl_udma_t	udma;
 	int 		rat_id;

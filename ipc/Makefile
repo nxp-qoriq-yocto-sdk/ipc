@@ -1,6 +1,7 @@
 CC=$(CROSS_COMPILE)gcc
 AR=$(CROSS_COMPILE)ar
-HET_DIR=$(KERNEL_DIR)/drivers/misc
+KERNEL_DIR1=$(PWD)/kernel
+HET_DIR=$(KERNEL_DIR1)
 CFLAGS=-Wall -O3 -lpthread -I ./include -I../fsl_shm/include -I $(HET_DIR) -Wall
 CFLAGS2=-Wall -I ./include -I../fsl_shm/include -I $(HET_DIR) -Wall
 

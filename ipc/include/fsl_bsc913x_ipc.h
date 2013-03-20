@@ -18,7 +18,7 @@ M	- Mandatory
 O	- Optional
 ****************/
 
-#include "fsl_types.h"
+#include "fsl_ipc_types.h"
 
 /* Defines */
 /*****************************************************************************/
@@ -40,7 +40,7 @@ typedef enum {
 *****************************************************************************/
 typedef struct {
 	uint8_t		tx_request_buf[MAX_TX_REQ_MSG_SIZE];
-	phys_addr_t	txreq_linearized_buf;	/* Pointer to the
+	unsigned long	txreq_linearized_buf;	/* Pointer to the
 						   linearized buffer*/
 } txreq_ctrl_t;
 
@@ -58,7 +58,7 @@ typedef struct {
  *
 *****************************************************************************/
 typedef struct {
-	phys_addr_t	src_addr;
+	unsigned long	src_addr;
 	uint32_t	len;
 	uint8_t		is_tb_start;
 	uint8_t		is_valid;
@@ -100,7 +100,7 @@ typedef void (*ipc_cbfunc_t)(uint32_t channel_id, void *context,
  * void*	- 	virtual address
  *
 *****************************************************************************/
-typedef void* (*ipc_p2v_t)(phys_addr_t phys_addr);
+typedef void* (*ipc_p2v_t)(unsigned long phys_addr);
 
 /*****************************************************************************
  * @fsl_ipc_init
@@ -108,17 +108,17 @@ typedef void* (*ipc_p2v_t)(phys_addr_t phys_addr);
  * Init function to initialize the IPC subsystem.
  *
  * p2vcb 	- [IN][M]pointer to a function which does p2v
- * sh_ctrl_area - [IN][M]range_t for shared control area
- * dsp_ccsr 	- [IN][M]range_t for dsp_ccsr
- * pa_ccsr 	- [IN][M]range_t for pa_ccsr
+ * sh_ctrl_area - [IN][M]mem_range_t for shared control area
+ * dsp_ccsr 	- [IN][M]mem_range_t for dsp_ccsr
+ * pa_ccsr 	- [IN][M]mem_range_t for pa_ccsr
  *
  * Return Value -
  *			fsl_ipc_t handle.
  *			This has to be provided in all subsequent calls to ipc
  *
 *****************************************************************************/
-fsl_ipc_t fsl_ipc_init(ipc_p2v_t p2vcb, range_t sh_ctrl_area, range_t dsp_ccsr,
-			range_t pa_ccsr);
+fsl_ipc_t fsl_ipc_init(ipc_p2v_t p2vcb, mem_range_t sh_ctrl_area,
+		mem_range_t dsp_ccsr, mem_range_t pa_ccsr);
 
 /*****************************************************************************
  * @fsl_ipc_init_rat
@@ -128,9 +128,9 @@ fsl_ipc_t fsl_ipc_init(ipc_p2v_t p2vcb, range_t sh_ctrl_area, range_t dsp_ccsr,
  * rat_id	- [IN][M]id of the rat for which ipc is instantiated.
  *			This is used on in multiRAT scenerio.
  * p2vcb 	- [IN][M]pointer to a function which does p2v
- * sh_ctrl_area - [IN][M]range_t for shared control area
- * dsp_ccsr 	- [IN][M]range_t for dsp_ccsr
- * pa_ccsr 	- [IN][M]range_t for pa_ccsr
+ * sh_ctrl_area - [IN][M]mem_range_t for shared control area
+ * dsp_ccsr 	- [IN][M]mem_range_t for dsp_ccsr
+ * pa_ccsr 	- [IN][M]mem_range_t for pa_ccsr
  *
  * Return Value -
  *			fsl_ipc_t handle.
@@ -138,7 +138,8 @@ fsl_ipc_t fsl_ipc_init(ipc_p2v_t p2vcb, range_t sh_ctrl_area, range_t dsp_ccsr,
  *
 *****************************************************************************/
 fsl_ipc_t fsl_ipc_init_rat(uint32_t rat_id, ipc_p2v_t p2vcb,
-		range_t sh_ctrl_area, range_t dsp_ccsr, range_t pa_ccsr);
+		mem_range_t sh_ctrl_area, mem_range_t dsp_ccsr,
+		mem_range_t pa_ccsr);
 
 /*****************************************************************************
  * @ipc_configure_channel
@@ -181,7 +182,7 @@ fsl_ipc_t fsl_ipc_init_rat(uint32_t rat_id, ipc_p2v_t p2vcb,
 *****************************************************************************/
 int fsl_ipc_configure_channel(uint32_t channel_id, uint32_t depth,
 			ipc_ch_type_t channel_type,
-			phys_addr_t msg_ring_paddr, uint32_t msg_size,
+			unsigned long msg_ring_paddr, uint32_t msg_size,
 			ipc_cbfunc_t cbfunc, fsl_ipc_t ipc);
 
 /*****************************************************************************
@@ -222,7 +223,7 @@ int fsl_ipc_open_prod_ch(uint32_t channel_id, fsl_ipc_t ipc);
  * Return Value -
  * 	ERR_SUCCESS - no error
  ****************************************************************************/
-int fsl_ipc_configure_txreq(uint32_t channel_id, phys_addr_t lbuff_phys_addr,
+int fsl_ipc_configure_txreq(uint32_t channel_id, unsigned long lbuff_phys_addr,
 			uint32_t max_txreq_linearized_buf_size, fsl_ipc_t ipc);
 
 /*****************************************************************************
@@ -240,7 +241,7 @@ int fsl_ipc_configure_txreq(uint32_t channel_id, phys_addr_t lbuff_phys_addr,
  * 	ERR_SUCCESS - no error
  * 	Non zero value - error (check fsl_ipc_errorcodes.h)
  ****************************************************************************/
-int fsl_ipc_send_ptr(uint32_t channel_id, phys_addr_t buffer_ptr,
+int fsl_ipc_send_ptr(uint32_t channel_id, unsigned long buffer_ptr,
 		uint32_t len, fsl_ipc_t ipc);
 /*****************************************************************************
  *@fsl_ipc_send_msg
@@ -293,7 +294,7 @@ int fsl_ipc_get_last_tx_req_status(fsl_ipc_t ipc);
  *
  * addr - [IN][M]
  * 	ipc copies this value from the ptr ring, and increments the
- * 	consumer index. (value is of phys_addr_t in most cases)
+ * 	consumer index. (value is of unsigned long in most cases)
  *
  * len - [IN][M]
  * 	length provided by the producer
@@ -302,7 +303,7 @@ int fsl_ipc_get_last_tx_req_status(fsl_ipc_t ipc);
  * 	ERR_SUCCESS - no error
  * 	Non zero value - error (check fsl_ipc_errorcodes.h)
  ****************************************************************************/
-int fsl_ipc_recv_ptr(uint32_t channel_id, phys_addr_t *addr, uint32_t *len,
+int fsl_ipc_recv_ptr(uint32_t channel_id, unsigned long *addr, uint32_t *len,
 			fsl_ipc_t ipc);
 
 /*****************************************************************************
@@ -312,7 +313,7 @@ int fsl_ipc_recv_ptr(uint32_t channel_id, phys_addr_t *addr, uint32_t *len,
  *
  * addr - [IN][M]
  * 	ipc copies this value from the ptr ring, and does not increment the
- * 	consumer index. (value is of phys_addr_t in most cases).
+ * 	consumer index. (value is of unsigned long in most cases).
  *	The consumer index is updated by calling fsl_ipc_set_consumed_status
  *
  * len - [IN][M]
@@ -322,8 +323,8 @@ int fsl_ipc_recv_ptr(uint32_t channel_id, phys_addr_t *addr, uint32_t *len,
  * 	ERR_SUCCESS - no error
  * 	Non zero value - error (check fsl_ipc_errorcodes.h)
  ****************************************************************************/
-int fsl_ipc_recv_ptr_hold(uint32_t channel_id, phys_addr_t *addr, uint32_t *len,
-			fsl_ipc_t ipc);
+int fsl_ipc_recv_ptr_hold(uint32_t channel_id, unsigned long *addr,
+		uint32_t *len, fsl_ipc_t ipc);
 
 /*****************************************************************************
  * @fsl_ipc_recv_msg
