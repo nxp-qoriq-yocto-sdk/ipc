@@ -89,8 +89,13 @@ static os_het_control_t	*ctrl;
 
 static int het_mgr_open(struct inode *inode, struct file *filep);
 static int het_mgr_release(struct inode *inode, struct file *filep);
+#ifdef HAVE_UNLOCKED_IOCTL
 static long het_mgr_ioctl(struct file *filp, unsigned int cmd,
 		unsigned long arg);
+#else
+static int het_mgr_ioctl(struct inode *inode, struct file *filp,
+		unsigned int cmd, unsigned long arg);
+#endif
 
 #ifdef CONFIG_MULTI_RAT
 uint32_t get_hetmgr_rat_instances(void)
@@ -326,8 +331,13 @@ static int het_mgr_release(struct inode *inode, struct file *filep)
 	return 0;
 }
 
+#ifdef HAVE_UNLOCKED_IOCTL
 static long het_mgr_ioctl(struct file *filp, unsigned int cmd,
 		unsigned long arg)
+#else
+static int het_mgr_ioctl(struct inode *inode, struct file *filp,
+		unsigned int cmd, unsigned long arg)
+#endif
 {
 	int ret = 0;
 	sys_map_t *tmp_sys_map;
@@ -437,7 +447,11 @@ static const struct file_operations het_mgr_fops = {
 	.owner	= THIS_MODULE,
 	.open = 	het_mgr_open,
 	.release =	het_mgr_release,
+#ifdef HAVE_UNLOCKED_IOCTL
 	.unlocked_ioctl =  	het_mgr_ioctl,
+#else
+	.ioctl =  	het_mgr_ioctl,
+#endif
 };
 
 int het_mgr_init(void)
