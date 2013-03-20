@@ -76,7 +76,7 @@ typedef enum {
     ((CH)->tracker.producer_num == (CH)->tracker.consumer_num)
 
 /* Evaluate whether the channel is full */
-#define OS_HET_CH_FULL(CH)  (OS_HET_CH_FREE_BDS(CH) == 0)
+#define OS_HET_CH_FULL(CH)  (os_het_ch_free_bds(CH) == 0)
 
 /* Increment the producer/consumer index */
 #define OS_HET_INCREMENT_INDEX(CH, INDEX)  (((CH)->tracker.##INDEX)++)
