@@ -120,14 +120,14 @@ int init_sh_ctrl_area(void)
 	ctrl = ioremap(
 		sys_map.sh_ctrl_area.phys_addr, sys_map.sh_ctrl_area.size);
 	if (!ctrl) {
-		printk(KERN_ERR"ioremap failed with addr=%lx val=%x\n",
-		 sys_map.sh_ctrl_area.phys_addr, sys_map.sh_ctrl_area.size);
-		 return -1;
+		pr_err("ioremap failed with addr=%lx val=%x\n",
+		sys_map.sh_ctrl_area.phys_addr, sys_map.sh_ctrl_area.size);
+		return -1;
 	}
 
+	/* zeroize the structure */
 	memset(ctrl, 0, sys_map.sh_ctrl_area.size);
 
-	/* zeroize the structure */
 	ctr += sizeof(os_het_control_t);
 	ctrl->shared_ctrl_size = 0x4000; /* 16k */
 	/* set the physical adress for ipc */
@@ -486,6 +486,7 @@ int het_mgr_init(void)
 	/* Fail gracefully if need be */
 	if (ret) {
 		pr_err("Error %d adding Heterogeneous System Manager", ret);
+		unregister_chrdev_region(fslhet_dev, 1);
 		return ret;
 	}
 
@@ -501,7 +502,10 @@ int het_mgr_init(void)
 	if (ret)
 		goto end;
 
+	return ret;
 end:
+	cdev_del(&fslhet_cdev);
+	unregister_chrdev_region(fslhet_dev, 1);
 	return ret;
 }
 
@@ -511,7 +515,7 @@ void het_mgr_exit(void)
 	unregister_chrdev_region(fslhet_dev, 1);
 }
 
-MODULE_AUTHOR("manish.jaggi@freescale.com");
+MODULE_AUTHOR("Ashish.Kumar@freescale.com");
 MODULE_DESCRIPTION("Heterogeneous System Manager driver");
 MODULE_LICENSE("GPL");
 

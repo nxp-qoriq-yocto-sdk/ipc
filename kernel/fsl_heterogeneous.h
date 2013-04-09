@@ -75,11 +75,8 @@ typedef struct {
 	/* SC shared memory region */
 
 	os_het_ipc_t            (*ipc)[];
-#if 0
-	os_hetero_aic_t         *aic;
-#else
+
 	void                    *aic;
-#endif
 	/* Pointer to shared AIC configuration control structure;
 	 * as an offset from the base of the shared address space */
 	os_het_smartdsp_log_t   (*smartdsp_debug)[];

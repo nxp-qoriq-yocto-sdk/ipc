@@ -55,13 +55,14 @@
 
 *//***************************************************************************/
 typedef enum {
-    /* Type of indication is virtual interrupt;
-	channel offset reletive to GIC */
+    /* Type of indication is virtual interrupt
+     * channel offset reletive to GIC */
     OS_HET_VIRTUAL_INT = 0,
-    /* Type of indication is MPIC message; channel offset reletive to MPIC */
+    /* Type of indication is MPIC message
+     *  channel offset reletive to MPIC */
     OS_HET_PA_MPIC,
-    /* Type of indication is by DSP mesh; channel offset reletive DSP
-	subsystem address */
+    /* Type of indication is by DSP mesh
+     * channel offset reletive DSP subsystem address */
     OS_HET_DSP_MESH,
     /* Type of indication is none */
     OS_HET_NO_INT,

@@ -37,9 +37,4 @@ typedef struct {
 	uint32_t	max_depth;
 } ipc_bootargs_info_t;
 
-typedef struct {
-	uint32_t	channel_id;
-	uint32_t	signal;
-} ipc_rc_t;
-
 #endif

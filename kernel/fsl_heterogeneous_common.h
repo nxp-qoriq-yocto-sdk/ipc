@@ -43,7 +43,7 @@
 #define __FSL_HETEROGENEOUS_COMMON_H
 
 /*************************************************************//**
- @Collection    Initialization indicaiton values
+ @Collection    Initialization indication values
 
  @{
 *//**************************************************************/
@@ -69,7 +69,7 @@
 #define OS_HET_FREE_SEMAPHORE_VAL       0x00
 /* @} */
 
-
+/* PASS / FAIL macro */
 typedef enum {
     OS_HETERO_FAIL      = 0,
     OS_HETERO_SUCCESS   = 1

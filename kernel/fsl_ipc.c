@@ -35,7 +35,6 @@
 #include <linux/mm.h>
 #include <linux/init.h>
 #include <linux/fs.h>
-#include <asm/irq.h>
 #include <asm/uaccess.h>
 #include <linux/cdev.h>
 #include "fsl_heterogeneous.h"
@@ -50,7 +49,6 @@
 #include <linux/sched.h>
 #include <linux/fcntl.h>
 #include <asm/processor.h>
-#include <asm/irq.h>
 #include <asm/io.h>
 
 static int fslipc_devno;
@@ -59,9 +57,9 @@ static struct cdev fslipc_cdev;
 static uint32_t het_ipc_major;
 static uint32_t het_ipc_minor;
 
-static long max_num_ipc_channels = 64;
+static long max_num_ipc_channels = MAX_IPC_CHANNELS;
 module_param(max_num_ipc_channels, long, S_IRUGO);
-static long max_channel_depth = 16;
+static long max_channel_depth = DEFAULT_CHANNEL_DEPTH;
 module_param(max_channel_depth, long, S_IRUGO);
 
 /*IPC */
@@ -83,14 +81,14 @@ extern struct fsl_msg_unit *fsl_get_msg_unit(void);
 extern uint32_t get_hetmgr_rat_instances(void);
 
 /*
- * @fsl_913xipc_init
+ * @fsl_ipc_init_ker
  *
  *This method is called by het_ipc to initialize ipc ptr channels
  *It is assumed that the caller (het_ipc) has mapped ipc structre
  *already at this address
 */
 #ifndef CONFIG_MULTI_RAT
-int fsl_913xipc_init(void)
+int fsl_ipc_init_ker(void)
 {
 	int ret = 0;
 	int i = 0;
@@ -152,7 +150,7 @@ end:
 	return ret;
 }
 #else
-int fsl_913xipc_init(void)
+int fsl_ipc_init_ker(void)
 {
 	int ret = 0;
 	int i = 0;
@@ -177,7 +175,7 @@ int fsl_913xipc_init(void)
 
 	rat_inst = get_hetmgr_rat_instances();
 	if (rat_inst <= 1) {
-		rat_inst = 2;
+		rat_inst = DEFAULT_RAT_INST;
 		printk(KERN_ERR"warning: max_rat_inst not set\
 		setting default value = %d\n", rat_inst);
 	}
@@ -230,7 +228,11 @@ end:
 	return ret;
 }
 #endif
-
+/*
+ * Open channel zero and initialize it to Pointer type
+ * The Star Core polls on channel zero
+ * to check whether the IPC is up and runing
+ */
 void open_channel_zero(os_het_ipc_channel_t *ch)
 {
 	ch[0].consumer_initialized = OS_HET_INITIALIZED;
@@ -277,7 +279,8 @@ int ipc_driver_init(void)
 	}
 
 	if (ret < 0) {
-		pr_err("het_ipc_dev: can't get major %d\n", het_ipc_major);
+		pr_err("Error can't get major %d in het_ipc_dev\n",
+			het_ipc_major);
 		return ret;
 	}
 
@@ -289,15 +292,19 @@ int ipc_driver_init(void)
 	ret = cdev_add(&fslipc_cdev, fslipc_devno, 1);
 
 	/* Fail gracefully if need be */
-	if (ret)
+	if (ret) {
 		pr_err("Error %d adding Heterogeneous System Manager", ret);
+		unregister_chrdev_region(fslipc_dev, 1);
+	}
 
-	pr_err("ipc_channels %ld\n", max_num_ipc_channels);
-	pr_err("ipc_depth %ld\n", max_channel_depth);
+	pr_err("max_num_ipc_channels %ld\n", max_num_ipc_channels);
+	pr_err("max_channel_depth %ld\n", max_channel_depth);
 
-	fsl_913xipc_init();
+	ret = fsl_ipc_init_ker();
+	if (ret)
+		unregister_chrdev_region(fslipc_dev, 1);
 
-	return 0;
+	return ret;
 }
 
 void ipc_driver_exit(void)
@@ -306,7 +313,7 @@ void ipc_driver_exit(void)
 	unregister_chrdev_region(fslipc_dev, 1);
 }
 
-MODULE_AUTHOR("manish.jaggi@freescale.com");
+MODULE_AUTHOR("Ashish.Kumar@freescale.com");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("IPC kernel mode helper driver");
 module_init(ipc_driver_init);
