@@ -123,7 +123,7 @@ static free_node *get_free_area_list(unsigned int size)
 	return NULL;
 }
 
-/************** list add/remove operations **********/
+/* list add/remove operations on the List*/
 
 static void list_add_allocated_area(allocated_node *entry)
 {

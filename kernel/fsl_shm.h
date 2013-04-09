@@ -29,17 +29,20 @@
 
 #include <linux/ioctl.h>
 
+/* shm segment type, stores PA and VA*/
 typedef struct shm_seg {
 	void *vaddr;
 	void *paddr;
 	size_t size;
 } shm_seg_t;
 
+/* store physical address, can be un-aligned */
 typedef struct alloc_req {
 	void *paddr;
 	size_t size;
 } alloc_req_t;
 
+/* stores aligned physical address */
 typedef struct memalign_req {
 	void *paddr;
 	unsigned long align;
