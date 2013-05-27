@@ -23,6 +23,7 @@
 #include "fsl_ipc_lock.h"
 
 #define BSC9132_MODEL_STR	"fsl,bsc9132"
+#define B4860QDS_MODEL_STR	"fsl,B4860QDS"
 
 #define SMAP(I, A, B, C) do {	\
 			priv->map[I].phys_addr = A;   \
@@ -139,7 +140,12 @@ int map_shared_mem(usmmgr_priv *priv)
 	void *vaddr;
 	FILE *fp;
 	char model_str[16] = {0};
+#ifdef B913x
 	int bytes =  strlen(BSC9132_MODEL_STR);
+#endif
+#ifdef B4860
+	int bytes =  strlen(B4860QDS_MODEL_STR);
+#endif
 	ENTER();
 	/* open /proc/device-tree/model to find
 	basc9132/bsc9131
@@ -177,21 +183,26 @@ int map_shared_mem(usmmgr_priv *priv)
 	}
 
 	/* MAP DSP private area in ddr */
+#ifdef B913x
 	MMAP(priv->het_sys_map.dsp_core0_m2.phys_addr,
 		priv->het_sys_map.dsp_core0_m2.size);
 	if (vaddr == MAP_FAILED)
 		return -1;
-
+#endif
 	if (!memcmp(model_str, BSC9132_MODEL_STR, bytes)) {
 		MMAP(priv->het_sys_map.dsp_core1_m2.phys_addr,
 			priv->het_sys_map.dsp_core1_m2.size);
 		if (vaddr == MAP_FAILED)
 			return -1;
-
 		MMAP(priv->het_sys_map.dsp_m3.phys_addr,
 			priv->het_sys_map.dsp_m3.size);
 		if (vaddr == MAP_FAILED)
 			return -1;
+	} else if (!memcmp(model_str, B4860QDS_MODEL_STR, bytes)) {
+			MMAP(priv->het_sys_map.dsp_m3.phys_addr,
+			priv->het_sys_map.dsp_m3.size);
+			if (vaddr == MAP_FAILED)
+				return -1;
 	}
 end:
 	EXIT(ret);
@@ -431,7 +442,7 @@ void *fsl_usmmgr_p2v(unsigned long phys_addr, fsl_usmmgr_t usmmgr)
 		if (phys_addr >= priv->map[i].phys_addr &&
 			phys_addr < priv->map[i].phys_addr + priv->map[i].size)
 			vaddr = (void *)(phys_addr - priv->map[i].phys_addr) +
-				(uint32_t)priv->map[i].vaddr;
+				(unsigned long)priv->map[i].vaddr;
 end:
 	EXIT(vaddr);
 	return vaddr;

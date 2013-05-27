@@ -393,10 +393,10 @@ int fsl_ipc_send_tx_req(uint32_t channel_id, sg_list_t *sgl,
 		ipc_ch->LOCAL_PRODUCER_NUM * ipc_priv->max_txreq_lbuff_size;
 
 	/*write the lbuff address at the end of the message */
-	debug_print("copying %x to %x length %x\n", ((uint32_t)vaddr +
+	debug_print("copying %x to %x length %x\n", ((unsigned long)vaddr +
 				MAX_TX_REQ_MSG_SIZE), phys_addr,
 			sizeof(unsigned long));
-	memcpy((void *)((uint32_t)vaddr + MAX_TX_REQ_MSG_SIZE),
+	memcpy((void *)((unsigned long)vaddr + MAX_TX_REQ_MSG_SIZE),
 			&phys_addr, sizeof(unsigned long));
 
 	ctr = 0;
@@ -428,8 +428,8 @@ int fsl_ipc_send_tx_req(uint32_t channel_id, sg_list_t *sgl,
 	/* Get physical address of producer_num */
 	phys_addr2 = get_channel_paddr(channel_id, ipc_priv);
 	debug_print("TXREQ 0: %x %x\n", phys_addr2, channel_id);
-	phys_addr2 += (uint32_t)&ipc_ch->tracker.producer_num -
-		(uint32_t)ipc_ch;
+	phys_addr2 += (unsigned long)&ipc_ch->tracker.producer_num -
+		(unsigned long)ipc_ch;
 	debug_print("TXREQ: PIaddr=%x val=%x\n",
 			phys_addr2, phys_addr);
 
@@ -437,14 +437,15 @@ int fsl_ipc_send_tx_req(uint32_t channel_id, sg_list_t *sgl,
 			sizeof(unsigned long), ipc_priv->udma);
 
 	/* Get physical address of LOCAL_PRODUCER_NUM */
-	memcpy((void *)((uint32_t)vaddr + 4), &incr2, sizeof(uint32_t));
+	memcpy((void *)((unsigned long)vaddr + 4), &incr2, sizeof(incr2));
 	debug_print("## Writing V=%x P=%x #=%x\n",
 			phys_addr + 4, vaddr + 4, incr2);
 
 	phys_addr2 = get_channel_paddr(channel_id, ipc_priv);
 	debug_print("TXREQ 0: %x %x\n", phys_addr2, channel_id);
 
-	phys_addr2 += (uint32_t)&ipc_ch->LOCAL_PRODUCER_NUM - (uint32_t)ipc_ch;
+	phys_addr2 += (unsigned long)&ipc_ch->LOCAL_PRODUCER_NUM -
+		(unsigned long)ipc_ch;
 	debug_print("TXREQ: PILaddr=%x val=%x\n", phys_addr2, phys_addr);
 
 	fsl_uspace_dma_add_entry(phys_addr + 4, phys_addr2,
@@ -454,7 +455,8 @@ int fsl_ipc_send_tx_req(uint32_t channel_id, sg_list_t *sgl,
 	if (ipc_ch->ipc_ind == OS_HET_VIRTUAL_INT) {
 		phys_addr2 = ipc_priv->dsp_ccsr.phys_addr + GCR_OFFSET +
 			ipc_ch->ind_offset;
-		memcpy(((void *)(uint32_t)vaddr + 8), &ipc_ch->ind_value, 4);
+		memcpy(((void *)(unsigned long)vaddr + 8), &ipc_ch->ind_value,
+				sizeof(ipc_ch->ind_value));
 		debug_print("TXREQ: INDaddr=%x val=%x\n",
 				phys_addr2, phys_addr);
 
@@ -627,9 +629,9 @@ end:
 
 void dump_ipc_channel(os_het_ipc_channel_t *ipc_ch)
 {
-	printf("ipc_ch%x PI=%x CI=%x ID=%x PN=%x CN=%x LPI=%x LCI=%x \
-			BS=%x MX=%x CH=%x BD=%x II=%x IO=%x IV=%x",
-			(uint32_t)ipc_ch,
+	printf("ipc_ch%lx PI=%x CI=%x ID=%x PN=%x CN=%x LPI=%x LCI=%x \
+			BS=%x MX=%x CH=%x BD=%lx II=%x IO=%x IV=%x",
+			(unsigned long)ipc_ch,
 			ipc_ch->producer_initialized,
 			ipc_ch->consumer_initialized,
 			ipc_ch->id,
@@ -640,7 +642,7 @@ void dump_ipc_channel(os_het_ipc_channel_t *ipc_ch)
 			ipc_ch->bd_ring_size,
 			ipc_ch->max_msg_size,
 			ipc_ch->ch_type,
-			(uint32_t)ipc_ch->bd_base,
+			(unsigned long)ipc_ch->bd_base,
 			ipc_ch->ipc_ind,
 			ipc_ch->ind_offset,
 			ipc_ch->ind_value);

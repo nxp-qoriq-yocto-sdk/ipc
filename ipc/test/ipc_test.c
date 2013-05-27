@@ -218,7 +218,7 @@ void test_init(int rat_id)
 	}
 	do {
 		fsl_ipc_chk_recv_status(&bmask, ipc);
-		printf("\n main loop #ret %llx \n", bmask);
+		printf("\n main loop #ret %llx \n", (long long)bmask);
 		usleep(10000);
 	} while (!(isbitset(bmask, 0)));
 

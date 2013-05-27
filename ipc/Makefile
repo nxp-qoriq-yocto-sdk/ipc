@@ -9,6 +9,16 @@ ifeq ($(CONFIG_LOCK), 1)
 	CFLAGS+=-DCONFIG_LOCK
 endif
 
+ifeq ($(B4860), 1)
+  CFLAGS2+=-DB4860
+  CFLAGS+=-DB4860
+endif
+
+ifeq ($(B913x), 1)
+  CFLAGS2+=-DB913x
+  CFLAGS+=-DB913x
+endif
+
 all: mem_lib ipc_lib ipc_test
 ipc_lib:
 	$(CC) -c ./lib/fsl_ipc_channel.c $(CFLAGS) -o ./lib/fsl_ipc_channel.o
@@ -16,13 +26,13 @@ ipc_lib:
 	$(CC) -c ./lib/fsl_ipc_lock.c $(CFLAGS) -o ./lib/fsl_ipc_lock.o
 	$(CC) -c ../dsp_boot/libdspboot.c $(CFLAGS2) -o ../dsp_boot/libdspboot.o
 	$(CC) -shared -fPIC ./lib/fsl_user_dma.o ./lib/fsl_ipc_channel.o ./lib/fsl_ipc_lock.o ../dsp_boot/libdspboot.o -o libipc.so
-#	$(AR) rcs libipc.a ./lib/fsl_ipc_channel.o ./lib/fsl_user_dma.o
+#	$(AR) rcs libipc.a ./lib/fsl_ipc_channel.o ./lib/fsl_ipc_lock.o ../dsp_boot/libdspboot.o ./lib/fsl_user_dma.o
 
 mem_lib:
 	$(CC) -c ./lib/fsl_usmmgr.c $(CFLAGS) -o ./lib/fsl_usmmgr.o
 	$(CC) -c ./lib/fsl_ipc_lock.c $(CFLAGS) -o ./lib/fsl_ipc_lock.o
 	$(CC) -shared -fPIC ./lib/fsl_usmmgr.o ./lib/fsl_ipc_lock.o -L../fsl_shm -llg_shm  -o libmem.so
-#	$(AR) rcs libmem.a ./lib/fsl_usmmgr.o
+#	$(AR) rcs libmem.a ./lib/fsl_usmmgr.o ./lib/fsl_ipc_lock.o ../fsl_shm/lib/lg_shm.o
 
 ipc_test:
 	$(CC) ./test/ipc_test.c $(CFLAGS) -L. -lipc -lmem -o ipc_test

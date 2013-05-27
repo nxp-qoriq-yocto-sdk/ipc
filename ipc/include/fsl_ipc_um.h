@@ -27,7 +27,7 @@ typedef struct {
 	int		init;
 	/* MAX TXreq Linerized TB buffer size */
 	uint32_t 	max_txreq_lbuff_size;
-	uint32_t 	txreq_tb_lbuff_paddr;
+	unsigned long 	txreq_tb_lbuff_paddr;
 
 	int 		num_channels;
 	ipc_channel_us_t *channels[MAX_CHANNELS];
