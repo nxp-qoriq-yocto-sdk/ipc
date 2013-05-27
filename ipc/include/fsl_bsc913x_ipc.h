@@ -111,6 +111,7 @@ typedef void* (*ipc_p2v_t)(unsigned long phys_addr);
  * sh_ctrl_area - [IN][M]mem_range_t for shared control area
  * dsp_ccsr 	- [IN][M]mem_range_t for dsp_ccsr
  * pa_ccsr 	- [IN][M]mem_range_t for pa_ccsr
+ * uiodevbuf 	- [IN][M]UIO INTERFACE to used
  *
  * Return Value -
  *			fsl_ipc_t handle.
@@ -118,7 +119,7 @@ typedef void* (*ipc_p2v_t)(unsigned long phys_addr);
  *
 *****************************************************************************/
 fsl_ipc_t fsl_ipc_init(ipc_p2v_t p2vcb, mem_range_t sh_ctrl_area,
-		mem_range_t dsp_ccsr, mem_range_t pa_ccsr);
+		mem_range_t dsp_ccsr, mem_range_t pa_ccsr, char uiodevbuf[]);
 
 /*****************************************************************************
  * @fsl_ipc_init_rat
@@ -131,6 +132,7 @@ fsl_ipc_t fsl_ipc_init(ipc_p2v_t p2vcb, mem_range_t sh_ctrl_area,
  * sh_ctrl_area - [IN][M]mem_range_t for shared control area
  * dsp_ccsr 	- [IN][M]mem_range_t for dsp_ccsr
  * pa_ccsr 	- [IN][M]mem_range_t for pa_ccsr
+ * uiodevbuf 	- [IN][M]UIO INTERFACE to used
  *
  * Return Value -
  *			fsl_ipc_t handle.
@@ -139,7 +141,7 @@ fsl_ipc_t fsl_ipc_init(ipc_p2v_t p2vcb, mem_range_t sh_ctrl_area,
 *****************************************************************************/
 fsl_ipc_t fsl_ipc_init_rat(uint32_t rat_id, ipc_p2v_t p2vcb,
 		mem_range_t sh_ctrl_area, mem_range_t dsp_ccsr,
-		mem_range_t pa_ccsr);
+		mem_range_t pa_ccsr, char uiodevbuf[]);
 
 /*****************************************************************************
  * @ipc_configure_channel

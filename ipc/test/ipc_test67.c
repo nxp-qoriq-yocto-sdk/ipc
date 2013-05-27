@@ -180,6 +180,8 @@ void test_init(int rat_id)
 	mem_range_t sh_ctrl;
 	mem_range_t dsp_ccsr;
 	mem_range_t pa_ccsr;
+	char uio_interface[12];
+	int uio_num;
 
 	ENTER();
 	printf("\n=========$IPC TEST Channel 67$====%s %s====\n", __DATE__,
@@ -210,16 +212,26 @@ void test_init(int rat_id)
 		return;
 	}
 
+	printf("Enter uio_interface you want to use\n like:\n /dev/uio0\n");
+	scanf("%s", uio_interface);
+	uio_num = atoi(&uio_interface[8]);
+	if ((memcmp(uio_interface, "/dev/uio", 8) != 0) ||
+		   uio_num > 3 || uio_num < 0 ||
+		   (strlen(uio_interface) != 9)) {
+		printf("Wrong interface\n");
+		exit(-1);
+	}
+
 	if (rat_id == 0) {
 		/* use of fsl_ipc_init is deprecated
 		* Instead use fsl_ipc_init_rat with rat_id 0,
 		* for non-MULTI RAT scenarios*/
 		ipc = fsl_ipc_init(
-			test_p2v, sh_ctrl, dsp_ccsr, pa_ccsr);
+			test_p2v, sh_ctrl, dsp_ccsr, pa_ccsr, uio_interface);
 	} else {
 		ipc = fsl_ipc_init_rat(
 			rat_id,
-			test_p2v, sh_ctrl, dsp_ccsr, pa_ccsr);
+			test_p2v, sh_ctrl, dsp_ccsr, pa_ccsr, uio_interface);
 	}
 
 	if (!ipc) {

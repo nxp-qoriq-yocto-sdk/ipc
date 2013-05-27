@@ -115,17 +115,26 @@ typedef struct {
 } uspace_dma_t;
 
 fsl_udma_t fsl_uspace_dma_init(mem_range_t dma_list_mem, mem_range_t pa_ccsr,
-			uint32_t dma_ch_id)
+			uint32_t dma_ch_id, char uio_dev_buf[])
 {
 	void *dma;
+	int fdma;
 	ENTER();
 
 	uspace_dma_t *dma_priv = malloc(sizeof(uspace_dma_t));
 	if (!dma_priv)
 		goto end;
 
-	dma = pa_ccsr.vaddr + DMA_ADDR;
 	debug_print("dma addr = %x\n", (uint32_t) dma);
+	fdma = open(uio_dev_buf, O_RDWR);
+	if (fdma < 0)
+		perror("open fail\n");
+
+	dma = mmap(0, PAGE_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED,
+			fdma, 0);
+	if (dma == MAP_FAILED)
+		perror("mmap failed\n");
+
 	dma_priv->dma =
 	    (volatile dma_regs_t *)((unsigned long)dma + DMA_REG_OFFSET
 			+dma_ch_id*DMA_CH_OFFSET);

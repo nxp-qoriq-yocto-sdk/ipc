@@ -49,7 +49,7 @@ typedef void *fsl_udma_t;
  *
 *****************************************************************************/
 fsl_udma_t fsl_uspace_dma_init(mem_range_t dma_list_mem, mem_range_t pa_ccsr,
-		uint32_t dma_ch_id);
+		uint32_t dma_ch_id, char uio_dev_buf[]);
 /*****************************************************************************
  * @fsl_uspace_dma_add_entry
  *

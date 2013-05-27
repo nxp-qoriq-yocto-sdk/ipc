@@ -64,16 +64,17 @@ void dump_ipc_channel(os_het_ipc_channel_t *);
 
 /***** Implementation ******************/
 fsl_ipc_t fsl_ipc_init(ipc_p2v_t p2vcb, mem_range_t sh_ctrl_area,
-		mem_range_t dsp_ccsr, mem_range_t pa_ccsr)
+		mem_range_t dsp_ccsr, mem_range_t pa_ccsr, char uiodevbuf[])
 {
 	uint32_t rat_id = 0;
 	return fsl_ipc_init_rat(rat_id, p2vcb, sh_ctrl_area,
-		dsp_ccsr, pa_ccsr);
+		dsp_ccsr, pa_ccsr, uiodevbuf);
 }
 
 
 fsl_ipc_t fsl_ipc_init_rat(uint32_t rat_id, ipc_p2v_t p2vcb,
-	mem_range_t sh_ctrl_area, mem_range_t dsp_ccsr, mem_range_t pa_ccsr)
+	mem_range_t sh_ctrl_area, mem_range_t dsp_ccsr, mem_range_t pa_ccsr,
+	char uiodevbuf[])
 {
 	int ret = ERR_SUCCESS;
 	ipc_userspace_t *ipc_priv = NULL;
@@ -119,6 +120,8 @@ fsl_ipc_t fsl_ipc_init_rat(uint32_t rat_id, ipc_p2v_t p2vcb,
 	for (i = 0; i < TOTAL_IPC_CHANNELS; i++)
 		ch_semid[i] = fsl_ipc_init_lock(chvpaddr_arr[i].phys_addr);
 #endif
+
+	memcpy(ipc_priv->uio_dev_buf, uiodevbuf, strlen(uiodevbuf));
 end:
 	EXIT(ret);
 	if (ret) /* if ret non zero free ipc_priv */
@@ -312,9 +315,8 @@ int fsl_ipc_configure_txreq(uint32_t channel_id, unsigned long phys_addr,
 	dma_list_mem.phys_addr = phys_addr_s;
 
 	dma_list_mem.vaddr = (*ipc_priv->p2vcb)(phys_addr_s);
-
 	ipc_priv->udma = fsl_uspace_dma_init(dma_list_mem, ipc_priv->pa_ccsr
-			, ipc_priv->rat_id);
+			, ipc_priv->rat_id, ipc_priv->uio_dev_buf);
 
 end:
 	if (locked)

@@ -50,6 +50,7 @@ typedef struct {
 	fsl_udma_t	udma;
 	int 		rat_id;
 	os_het_ipc_t	*ipc_inst;
+	char uio_dev_buf[100];
 } ipc_userspace_t;
 
 #endif /* FSL_IPC_UM_H_ */

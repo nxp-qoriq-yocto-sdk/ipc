@@ -13,6 +13,7 @@
 #include "fsl_bsc913x_ipc.h"
 #include "fsl_ipc_errorcodes.h"
 #define DSP_IMAGE_NAME "/dsp_images/vnmi15_9132_recovery_dbg.bin"
+#define UIO_INTERFACE   "/dev/uio0"
 
 #define ENTER()	printf(">> %s %d %s\n", __FILE__, __LINE__, __func__)
 #define EXIT(A)	printf("<< (%d) %s %d %s\n", A, __FILE__, __LINE__, __func__)
@@ -84,11 +85,11 @@ void test_init(int rat_id)
 		* Instead use fsl_ipc_init_rat with rat_id 0,
 		* for non-MULTI RAT scenarios*/
 		ipc = fsl_ipc_init(
-			test_p2v, sh_ctrl, dsp_ccsr, pa_ccsr);
+			test_p2v, sh_ctrl, dsp_ccsr, pa_ccsr, UIO_INTERFACE);
 	} else {
 		ipc = fsl_ipc_init_rat(
 			rat_id,
-			test_p2v, sh_ctrl, dsp_ccsr, pa_ccsr);
+			test_p2v, sh_ctrl, dsp_ccsr, pa_ccsr, UIO_INTERFACE);
 	}
 
 	if (!ipc) {
