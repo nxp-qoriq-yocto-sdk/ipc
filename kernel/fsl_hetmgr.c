@@ -33,30 +33,15 @@
  */
 #include "fsl_ipc_types.h"
 #include "fsl_het_mgr.h"
+#include <linux/io.h>
 #include <linux/mm.h>
 #include <linux/fs.h>
 #include <linux/cdev.h>
 #include <linux/of.h>
 #include <asm/uaccess.h>
 #include "fsl_heterogeneous.h"
+#include "fsl_ker_compact.h"
 
-#define	PA_CCSRBAR	0xff700000
-#define PA_CCSR_SZ	0x00100000
-#define DSP_CCSRBAR	0xff600000
-#define DSP_CCSR_SZ	0x00100000
-#define DSP_CORE0_M2	0xb0000000
-#define DSP_CORE1_M2	0xb1000000
-#define DSP_M3		0xc0000000
-#define DSP_CORE0_M2_SZ	(512*1024)
-#define DSP_CORE1_M2_SZ	(512*1024)
-#define DSP_M3_SZ	(32*1024)
-#define HW_SEM_OFFSET	0x17100
-
-#define	DSP_SHARED_SZ			0x1000000
-#define	SHARED_CTRL_AREA_START_ADDR	0x37000000
-#define	SHARED_CTRL_AREA_SZ		0x1000000
-#define	DSP_PVT_START_ADDR		0x38000000
-#define	DSP_PVT_SZ			0x8000000
 
 static long dsp_shared_size = DSP_SHARED_SZ;
 module_param(dsp_shared_size , long, S_IRUGO);
@@ -109,7 +94,7 @@ EXPORT_SYMBOL(get_hetmgr_rat_instances);
 int init_sh_ctrl_area(void)
 {
 	int ctr = 0;
-	uint32_t tmp;
+	unsigned long tmp;
 	os_het_debug_print_t      *het_debug_print_v;
 	os_het_debug_print_sc_t   *het_debug_print_sc_array_v;
 
@@ -143,8 +128,8 @@ int init_sh_ctrl_area(void)
 #endif
 	tmp = sys_map.sh_ctrl_area.phys_addr + ctr;
 
-	memcpy((void *)&ctrl->smartdsp_debug, &tmp, sizeof(uint32_t));
-	pr_info("Smart DSP Debug start address = %x\n", tmp);
+	memcpy((void *)&ctrl->smartdsp_debug, &tmp, sizeof(long));
+	pr_info("Smart DSP Debug start address = %lx\n", tmp);
 
 	ctr += sizeof(os_het_smartdsp_log_t) * 2;
 
@@ -153,7 +138,8 @@ int init_sh_ctrl_area(void)
 	tmp = sys_map.sh_ctrl_area.phys_addr + ctr;
 	ctrl->het_debug_print = (os_het_debug_print_t *)tmp;
 
-	het_debug_print_v =  (os_het_debug_print_t *) ((uint32_t) ctrl + ctr);
+	het_debug_print_v =
+		(os_het_debug_print_t *) ((unsigned long) ctrl + ctr);
 
 	ctr += sizeof(os_het_debug_print_t);
 
@@ -164,7 +150,7 @@ int init_sh_ctrl_area(void)
 	het_debug_print_v->sc_debug_print = (void *)tmp;
 
 	het_debug_print_sc_array_v =
-	(os_het_debug_print_sc_t *) ((uint32_t) ctrl + ctr);
+	(os_het_debug_print_sc_t *) ((unsigned long) ctrl + ctr);
 
 	memset((void *)het_debug_print_sc_array_v,
 			0,
@@ -177,7 +163,8 @@ int init_sh_ctrl_area(void)
 	/*debug_print initilization end*/
 
 	sh_ctrl_area_mark = sys_map.sh_ctrl_area.phys_addr + ctr;
-	pr_info("Free Area starts from %x\n", sh_ctrl_area_mark);
+	pr_info("Free Area starts from %llx\n",
+		(unsigned long long)sh_ctrl_area_mark);
 
 	return 0;
 }
@@ -222,7 +209,7 @@ static int hugev2p(mem_range_t *r)
 	if (ret > 0) {
 		npages = ret;
 		pg = &pages[0];
-		pr_info("%x Addr\n", page_to_phys(pg));
+		pr_info("%llx Addr\n", (unsigned long long)page_to_phys(pg));
 		r->phys_addr = page_to_phys(pg);
 		put_page(pg);
 	}
@@ -272,13 +259,17 @@ int get_het_sys_map(sys_map_t *sysmap)
 		sysmap->sh_ctrl_area.size = SHARED_CTRL_AREA_SZ;
 
 	pr_info("IPC: shared_ctrl_size - %#x\n", sysmap->sh_ctrl_area.size);
-
+#ifdef DSP_CORE0_M2
 	sysmap->dsp_core0_m2.phys_addr = DSP_CORE0_M2;
 	sysmap->dsp_core0_m2.size = DSP_CORE0_M2_SZ;
-
-	if (of_find_compatible_node(NULL, NULL, "fsl,bsc9132-immr")) {
+#endif
+	if ((of_find_compatible_node(NULL, NULL, "fsl,bsc9132qds")) ||
+	   (of_find_compatible_node(NULL, NULL, "fsl,B4860QDS"))) {
+#ifdef DSP_CORE1_M2
 		sysmap->dsp_core1_m2.phys_addr = DSP_CORE1_M2;
 		sysmap->dsp_core1_m2.size = DSP_CORE1_M2_SZ;
+#endif
+		pr_info("IPC: M2 and M3 exist in star core\n");
 		sysmap->dsp_m3.phys_addr = DSP_M3;
 		sysmap->dsp_m3.size = DSP_M3_SZ;
 	}
@@ -296,7 +287,7 @@ int get_hetmgr_ipc_addr(mem_range_t *r, int inst_id)
 #ifdef CONFIG_MULTI_RAT
 	r->phys_addr += inst_id*sizeof(os_het_ipc_t);
 #endif
-	r->vaddr = (void *)ctrl + ((uint32_t)ctrl->ipc -
+	r->vaddr = (void *)ctrl + ((unsigned long)ctrl->ipc -
 #ifndef CONFIG_MULTI_RAT
 	sys_map.sh_ctrl_area.phys_addr);
 #else
@@ -361,7 +352,8 @@ static int het_mgr_ioctl(struct inode *inode, struct file *filp,
 			break;
 		}
 
-		pr_info("Virt Address=%x Size=%x\n", (uint32_t)r.vaddr, r.size);
+		pr_info("Virt Address=%lx Size=%x\n", (unsigned long)r.vaddr,
+			r.size);
 		ret = hugev2p(&r);
 		if (copy_to_user(tmp, &r, sizeof(mem_range_t)))
 			ret = -EFAULT;

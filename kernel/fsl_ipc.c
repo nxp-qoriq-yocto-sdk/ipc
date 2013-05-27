@@ -99,10 +99,10 @@ int fsl_ipc_init_ker(void)
 	if (ret)
 		goto end;
 	ipc = r.vaddr;
-	pr_err("os_het_ipc_t phys=%x vaddr=%x \n", (uint32_t)r.phys_addr,
-			(uint32_t)r.vaddr);
+	pr_err("os_het_ipc_t phys=%llx vaddr=%p \n",
+		(unsigned long long)r.phys_addr, r.vaddr);
 	num_channels = max_num_ipc_channels;
-	if (num_channels <= 0 || num_channels > 64) {
+	if (num_channels <= 0) {
 		num_channels = MAX_IPC_CHANNELS;
 		printk(KERN_ERR"warning: max_num_ipc_channels not set properly,\
 		setting default value = %d\n", num_channels);

@@ -17,6 +17,14 @@ ifeq ($(CONFIG_MULTI_RAT), 1)
     ccflags-y += -DCONFIG_MULTI_RAT
 endif
 
+ifeq ($(B913x), 1)
+    ccflags-y += -DB913x
+endif
+
+ifeq ($(B4860), 1)
+    ccflags-y += -DB4860
+endif
+
 include $(KERNEL_DIR)/.config
 
 ifneq ($(CONFIG_SYS_SUPPORTS_HUGETLBFS),y)

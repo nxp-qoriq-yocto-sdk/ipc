@@ -31,7 +31,7 @@
 #include <linux/fs.h>
 #include <linux/slab.h>
 #include <asm/uaccess.h>
-
+#include <linux/io.h>
 #include "fsl_shm.h"
 
 #define MIN_FREE_SIZE_LIST		0x1000
