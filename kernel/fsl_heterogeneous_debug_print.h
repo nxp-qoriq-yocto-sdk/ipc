@@ -1,6 +1,5 @@
 /*
- * Copyright (c) 2013
- *  Freescale Semiconductor Inc.
+ * Copyright (c) 2013 Freescale Semiconductor Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -42,13 +41,17 @@
 
 #include "fsl_heterogeneous_common.h"
 
+#ifdef B913x
 /* The number of tables used by debug print for each core */
 #define NUM_OF_DBGP_TABLES_PER_SC           2
 
 /*  The number of SC cores supported by debug print */
 #define NUM_OF_DBGP_SC_CORES                1
 
-
+#else
+/*  The Maximum nuber of segments of the buffer*/
+#define MAX_NUM_OF_SEGMENT                    32
+#endif
 typedef struct {
 	uint64_t 	system_clock;
 	uint64_t 	DSP_clock;
@@ -58,7 +61,7 @@ typedef struct {
  @Description   SmartDSP Debug print structure
 
 *//***************************************************************************/
-
+#ifdef B913x
 typedef struct {
 
 	/* Pointer to the base address of the SC VTB */
@@ -95,6 +98,38 @@ typedef struct {
     os_het_debug_print_sc_t (*sc_debug_print)[];
 
 } os_het_debug_print_t;
+#else /* B4860 */
+
+typedef struct {
+
+	/* Pointer to the base address of the SC VTB */
+    uint64_t                buffer_location;
+    /* Size of each segment in VTB */
+    uint32_t                 segment_size;
+    /* Number of VTB segments */
+    uint32_t                 num_of_segments;
+    /* Tracker for segment number
+     * SC client is the producer and PA engine is the consumer */
+    os_het_tracker_t        tracker;
+    /* 64 bits clock for each segment */
+    debug_print_clocks_t    segment_clock[MAX_NUM_OF_SEGMENT];
+    /* Overflow indicator */
+    uint32_t                 overflow;
+    uint64_t                 reserved[4];
+
+} os_het_debug_print_sc_t;
 
 
+typedef struct {
+    /* PA Debug Print shared memory region */
+    os_het_mem_t            pa_debug_print_shared;
+    /* SC Debug Print shared memory region */
+    os_het_mem_t            sc_debug_print_shared;
+    /* SC Debug Print control region */
+    uint32_t                sc_array_size;
+    /* SC debug print main structure*/
+    os_het_debug_print_sc_t sc_debug_print;
+} os_het_debug_print_t;
+
+#endif
 #endif /*__FSL_HETEROGENEOUS_DEBUG_PRINT_H*/

@@ -25,7 +25,7 @@
 
 #define HET_MGR_MAGIC	'S'
 /* IOCTL to get het sys_map_t */
-#define IOCTL_HET_MGR_GET_SYS_MAP	_IOR(HET_MGR_MAGIC, 1, sys_map_t *)
+#define IOCTL_HET_MGR_GET_SYS_MAP	_IOWR(HET_MGR_MAGIC, 1, uint64_t)
 /* IOCTL to get virtual to physical addr */
 #define IOCTL_HET_MGR_V2P		_IOR(HET_MGR_MAGIC, 2, mem_range_t *)
 /* IOCTL to set hardware shemaphore id */
@@ -33,7 +33,7 @@
 /* IOCTL to get hardware shemaphore id */
 #define IOCTL_HET_MGR_GET_SHMID		_IOR(HET_MGR_MAGIC, 4, uint32_t *)
 /* IOCTL to get shared memory area size */
-#define IOCTL_HET_MGR_SET_SHARED_AREA	_IOW(HET_MGR_MAGIC, 5, shared_area_t*)
+#define IOCTL_HET_MGR_SET_SHARED_AREA	_IOW(HET_MGR_MAGIC, 5, uint64_t)
 /* IOCTL to set Initialization marker of IPC start area */
 #define IOCTL_HET_MGR_SET_INITIALIZED	_IOW(HET_MGR_MAGIC, 6, uint32_t)
 /* IOCTL to get hardware shemaphore value */

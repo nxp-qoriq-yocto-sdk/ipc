@@ -50,12 +50,12 @@
 #endif
 
 typedef struct {
-	unsigned long phys_addr;
+	__u64 phys_addr;
 	__u32	size;
 } mem_strt_addr_t;
 
 typedef struct {
-	unsigned long phys_addr;
+	__u64 phys_addr;
 	void    *vaddr;
 	__u32 size;
 } mem_range_t;

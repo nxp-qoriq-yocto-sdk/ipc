@@ -615,8 +615,10 @@ static int fsl_shm_get_paddr(shm_seg_t *mem)
 	if (ret > 0) {
 		npages = ret;
 		pg = &pages[0];
-		mem->paddr = (void *)page_to_phys(pg);
+		mem->paddr = page_to_phys(pg);
 		put_page(pg);
+	} else{
+		printk(KERN_ERR "in func %s ret = (%i)\n", __func__, ret);
 	}
 
 	return 0;
@@ -646,7 +648,6 @@ static int fsl_shm_ioctl(struct inode *inode, struct file *file,
 		}
 
 		fsl_shm_get_paddr(&seg);
-
 		spin_lock(&mm_lock);
 		if (initialized) {
 			initialized++;
@@ -665,7 +666,7 @@ static int fsl_shm_ioctl(struct inode *inode, struct file *file,
 			break;
 		}
 
-		mem.paddr = fsl_shm_alloc(mem.size);
+		mem.paddr = (__u64)fsl_shm_alloc(mem.size);
 		if (copy_to_user((alloc_req_t *) arg, &mem,
 		    sizeof(alloc_req_t)))
 			ret = -EFAULT;
@@ -679,7 +680,7 @@ static int fsl_shm_ioctl(struct inode *inode, struct file *file,
 		}
 
 		memalign.paddr =
-		    fsl_shm_memalign(memalign.size, memalign.align);
+		   (__u64)fsl_shm_memalign(memalign.size, memalign.align);
 		if (copy_to_user((memalign_req_t *) arg, &memalign,
 		    sizeof(memalign_req_t)))
 			ret = -EFAULT;
@@ -707,6 +708,10 @@ static const struct file_operations fsl_shm_fops = {
 	.unlocked_ioctl = fsl_shm_ioctl,
 #else
 	.ioctl = fsl_shm_ioctl,
+#endif
+
+#ifdef CONFIG_COMPAT
+	.compat_ioctl = fsl_shm_ioctl,
 #endif
 };
 

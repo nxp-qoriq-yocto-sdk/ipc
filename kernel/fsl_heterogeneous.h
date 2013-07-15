@@ -1,6 +1,5 @@
 /*
- * Copyright (c) 2011-2013
- * Freescale Semiconductor Inc.
+ * Copyright (c) 2011-2013 Freescale Semiconductor Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -62,6 +61,7 @@
  @Description   Heterogeneous OS global control structure
 
 **************************************************************************/
+#ifdef B913x
 typedef struct {
 	os_het_init_t           initialized;
 	/* Initialization indication strcuture */
@@ -88,7 +88,35 @@ typedef struct {
 	uint32_t                num_ipc_regions;
 #endif
 } os_het_control_t;
+#else /* B4860 */
 
+typedef struct {
+    /* Initialization indication strcuture */
+    os_het_init_t           initialized;
+    /* SET BY PA: PA shared memory region; */
+    os_het_mem_t            pa_shared_mem;
+    /* SET BY DSP: SC shared memory region; */
+    os_het_mem_t            sc_shared_mem;
+    /* Pointer to array of os_het_ipc_t
+     * Pointer IPC heterogeneous structure */
+    uint64_t		    ipc;
+    /* Pointer to be used for future purposes */
+    uint64_t		aic;
+    /* SET BY PA: Pointer to where SmartDSP logs system events
+     * PA initializes an array with the number of entries as
+     * there is SC cores*/
+    uint64_t           smartdsp_debug;
+    os_het_debug_print_t    het_debug_print;
+    /* SET BY DSP: Size of the shared memory for control information in
+     * bytes - Mimumum size is 4 KB set by PA*/
+    uint32_t                shared_ctrl_size;
+#ifdef CONFIG_MULTI_RAT
+    /* Number of IPC regions - only for multimode usages */
+    uint32_t                num_ipc_regions;
+#endif
+} os_het_control_t;
+
+#endif
 extern os_het_control_t  *g_os_het_control;
 /* Pointer to the base address of the heterogeneous OS control strcuture */
 

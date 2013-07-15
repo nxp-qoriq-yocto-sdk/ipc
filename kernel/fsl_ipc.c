@@ -99,7 +99,7 @@ int fsl_ipc_init_ker(void)
 	if (ret)
 		goto end;
 	ipc = r.vaddr;
-	pr_err("os_het_ipc_t phys=%llx vaddr=%p \n",
+	pr_debug("os_het_ipc_t phys=%llx vaddr=%p  \n",
 		(unsigned long long)r.phys_addr, r.vaddr);
 	num_channels = max_num_ipc_channels;
 	if (num_channels <= 0) {
@@ -123,6 +123,8 @@ int fsl_ipc_init_ker(void)
 	ret = get_hetmgr_mem(&r1);
 	if (ret)
 		goto end;
+	pr_debug("ipc->ipc_channels phys=%llx vaddr=%p  \n",
+		(unsigned long long)r1.phys_addr, r1.vaddr);
 
 	memcpy(&ipc->ipc_channels, &r1.phys_addr, sizeof(phys_addr_t));
 	ipc->num_ipc_channels = num_channels;

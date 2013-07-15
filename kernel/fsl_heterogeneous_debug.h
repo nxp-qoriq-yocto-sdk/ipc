@@ -1,15 +1,5 @@
-
-/******************************************************************************
- $Date: 2011/08/31 09:51:02 $
- $Id: fsl_heterogeneous_debug.h,v 1.2 2011/08/31 09:51:02 dovl Exp $
- $Source: /home/swproj/sw/REPOSITORY/dsp/SmartDSP/include/arch/starcore
-/psc9x3x/heterogeneous/fsl_heterogeneous_debug.h,v $
- $Revision: 1.2 $
-******************************************************************************/
-
 /*
- * Copyright (c) 2013
- *  Freescale Semiconductor Inc.  All rights reserved.
+ * Copyright (c) 2013 Freescale Semiconductor Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -56,6 +46,7 @@
 /*@Description   SmartDSP Event log*/
 
 /***************************************************************************/
+#ifdef B913x
 typedef struct {
     /* Pointer to the core's event log(physical address) */
     uintptr_t   base_address;
@@ -65,5 +56,15 @@ typedef struct {
 	* means no error */
     uint32_t	*last_error;
 } os_het_smartdsp_log_t;
-
+#else /* B4860 */
+typedef struct {
+    /* Pointer to the core's event log(physical address) */
+    uint64_t   base_address;
+    /* Size of the event log (in bytes) */
+    uint32_t    size;
+    /* Pointer to the last error in SmartDSP. A value of 1 (OS_SUCCESS)
+	* means no error */
+    uint64_t	last_error;
+} os_het_smartdsp_log_t;
+#endif
 #endif /*__FSL_HETEROGENEOUS_DEBUG_H*/

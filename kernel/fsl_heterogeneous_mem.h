@@ -1,15 +1,5 @@
-
-/******************************************************************************
- $Date: 2011/07/27 11:11:40 $
- $Id: fsl_heterogeneous_mem.h,v 1.2 2011/07/27 11:11:40 dovl Exp $
- $Source: /home/swproj/sw/REPOSITORY/dsp/SmartDSP/include/arch/starcore
-/psc9x3x/heterogeneous/fsl_heterogeneous_mem.h,v $
- $Revision: 1.2 $
-******************************************************************************/
-
 /*
- * Copyright (c) 2013
- *  Freescale Semiconductor Inc.
+ * Copyright (c) 2013 Freescale Semiconductor Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -59,11 +49,19 @@
 		This structure will be used to describe a shared memory slab.
 
 *//***************************************************************************/
+#ifdef B913x
 typedef struct {
     /* Indicates the start address of a memory region */
     uintptr_t   start_addr;
     /* Indicates the size of a memory region */
     uint32_t    size;
 } os_het_mem_t;
-
+#else /*B4860 */
+typedef struct {
+    /* Indicates the start address of a memory region */
+    uint64_t   start_addr;
+    /* Indicates the size of a memory region */
+    uint64_t    size;
+} os_het_mem_t;
+#endif
 #endif /*__FSL_HETEROGENEOUS_MEM_H*/

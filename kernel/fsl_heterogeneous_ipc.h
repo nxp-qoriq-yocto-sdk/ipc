@@ -1,6 +1,5 @@
 /*
- * Copyright (c) 2011-2013
- * Freescale Semiconductor Inc.
+ * Copyright (c) 2011-2013 Freescale Semiconductor Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -64,6 +63,11 @@ typedef enum {
     /* Type of indication is by DSP mesh
      * channel offset reletive DSP subsystem address */
     OS_HET_DSP_MESH,
+#ifdef B4860
+    /* Type of indication is by MPIC MSI
+     * channel offset reletive to MPIC */
+    OS_HET_DSP_MPIC_MSI,
+#endif
     /* Type of indication is none */
     OS_HET_NO_INT,
     /* MUST BE LEFT LAST */
@@ -92,6 +96,7 @@ typedef enum {
  @Description   IPC message descriptor
 
 *//***************************************************************************/
+#ifdef B913x
 typedef struct {
     /* Pointer to the message; as an offset from the base of the shared
        address space */
@@ -100,8 +105,16 @@ typedef struct {
        OS_HET_IPC_POINTER_CH channel types only */
     uint32_t	msg_len;
 } os_het_ipc_bd_t;
-
-
+#else
+typedef struct {
+    /* Pointer to the message; as an offset from the base of the shared
+       address space */
+    uint64_t   msg_ptr;
+    /* Size of the message; may be set to OS_HET_UNSPECIFIED_LEN on
+       OS_HET_IPC_POINTER_CH channel types only */
+    uint32_t	msg_len;
+} os_het_ipc_bd_t;
+#endif
 /**************************************************************************//**
  @Description   Types of IPC channels
 
@@ -156,7 +169,11 @@ typedef struct {
 	the shared address space;
 	This field is allocated by Linux during boot based on
 	os_het_ipc_t.ipc_max_bd_size */
+#ifdef B913x
     os_het_ipc_bd_t         (*bd_base)[];
+#else
+    uint64_t		     bd_base;
+#endif
     /* Type of indication to generate to the destination;
 	This field is written by the consumer */
     os_het_ipc_ind_t        ipc_ind;
@@ -170,7 +187,11 @@ typedef struct {
     uint32_t		    pa_reserved[2];
     /* Future compatibility semaphore pointer;
 	This field is set to NULL by Linux during boot */
+#ifdef B913x
     void		    *semaphore_pointer;
+#else
+    uint64_t 		     semaphore_pointer;
+#endif
 } os_het_ipc_channel_t;
 
 
@@ -188,7 +209,11 @@ typedef struct {
     /* Pointer to the mailboxes control structure array;
 		has os_het_ipc_t.num_ipc_channels entries
 	as an offset from the base of the shared address space */
+#ifdef B913x
     os_het_ipc_channel_t    (*ipc_channels)[];
+#else
+    uint64_t    ipc_channels;
+#endif
 } os_het_ipc_t;
 
 static inline int os_het_ch_free_bds(void *ipc_ch)

@@ -91,6 +91,7 @@ EXPORT_SYMBOL(get_hetmgr_rat_instances);
 #endif
 
 
+#ifdef B913x
 int init_sh_ctrl_area(void)
 {
 	int ctr = 0;
@@ -99,14 +100,15 @@ int init_sh_ctrl_area(void)
 	os_het_debug_print_sc_t   *het_debug_print_sc_array_v;
 
 	pr_info("Initializing Shared control area\n");
-	pr_info("Shared Control area start address = %lx\n",
+	pr_info("Shared Control area start address = %llx\n",
 			sys_map.sh_ctrl_area.phys_addr);
 
 	ctrl = ioremap(
 		sys_map.sh_ctrl_area.phys_addr, sys_map.sh_ctrl_area.size);
 	if (!ctrl) {
-		pr_err("ioremap failed with addr=%lx val=%x\n",
-		sys_map.sh_ctrl_area.phys_addr, sys_map.sh_ctrl_area.size);
+		pr_err("ioremap failed with addr=%llx val=%x\n",
+		(long long unsigned int)sys_map.sh_ctrl_area.phys_addr,
+		sys_map.sh_ctrl_area.size);
 		return -1;
 	}
 
@@ -118,8 +120,8 @@ int init_sh_ctrl_area(void)
 	/* set the physical adress for ipc */
 	/* casting is done just to avoid compilation errors */
 	ctrl->ipc = (void *)(sys_map.sh_ctrl_area.phys_addr + ctr);
-	pr_info("IPC structure start address = %lx\n",
-			sys_map.sh_ctrl_area.phys_addr + ctr);
+	pr_info("IPC structure start address = %llx\n",
+		(long long unsigned int)sys_map.sh_ctrl_area.phys_addr + ctr);
 #ifndef CONFIG_MULTI_RAT
 	ctr += sizeof(os_het_ipc_t);
 #else
@@ -168,6 +170,55 @@ int init_sh_ctrl_area(void)
 
 	return 0;
 }
+#else /* B4860 */
+int init_sh_ctrl_area(void)
+{
+	int ctr = 0;
+	uint64_t tmp;
+
+	pr_debug("Initializing Shared control area\n");
+	pr_debug("Shared Control area start address = %llx\n",
+			sys_map.sh_ctrl_area.phys_addr);
+
+	ctrl = ioremap(
+		sys_map.sh_ctrl_area.phys_addr, sys_map.sh_ctrl_area.size);
+	if (!ctrl) {
+		pr_err("ioremap failed with addr=%llx val=%x\n",
+		sys_map.sh_ctrl_area.phys_addr, sys_map.sh_ctrl_area.size);
+		return -1;
+	}
+
+
+	/* zeroize the structure */
+	memset(ctrl, 0, sys_map.sh_ctrl_area.size);
+	pr_debug("sys_map.sh_ctrl_area.size=%x\n", sys_map.sh_ctrl_area.size);
+	ctrl->shared_ctrl_size = 0x4000; /* 16k */
+
+	ctr += sizeof(os_het_control_t);
+	/* set the physical adress for ipc */
+	ctrl->ipc = (sys_map.sh_ctrl_area.phys_addr + ctr);
+	pr_debug("IPC: structure start address = %llx\n",
+			sys_map.sh_ctrl_area.phys_addr + ctr);
+#ifndef CONFIG_MULTI_RAT
+	ctr += sizeof(os_het_ipc_t);
+#else
+	ctrl->num_ipc_regions =  MAX_NUM_IPC_REGIONS;
+	ctr += ctrl->num_ipc_regions * sizeof(os_het_ipc_t);
+#endif
+	tmp = sys_map.sh_ctrl_area.phys_addr + ctr;
+
+	ctrl->smartdsp_debug = tmp;
+	pr_debug("IPC: Smart DSP Debug start address = %llx\n", tmp);
+
+
+	ctr += sizeof(os_het_smartdsp_log_t) * 2;
+	sh_ctrl_area_mark = sys_map.sh_ctrl_area.phys_addr + ctr;
+	pr_debug("IPC: Free Area starts from %llx\n",
+		(unsigned long long)sh_ctrl_area_mark);
+
+	return 0;
+}
+#endif
 
 int init_hw_sem(void)
 {
@@ -177,7 +228,7 @@ int init_hw_sem(void)
 		return -1;
 	}
 
-	pr_info("virt addr of sem= %p\n", sem);
+	pr_debug("virt addr of sem= %p\n", sem);
 
 	return 0;
 }
@@ -237,7 +288,7 @@ int get_het_sys_map(sys_map_t *sysmap)
 	if (sysmap->smart_dsp_os_priv_area.phys_addr < DSP_PVT_START_ADDR)
 		sysmap->smart_dsp_os_priv_area.phys_addr = DSP_PVT_START_ADDR;
 
-	pr_info("IPC: dsp_private_addr - %#lx\n",
+	pr_info("IPC: dsp_private_addr - %#llx\n",
 		sysmap->smart_dsp_os_priv_area.phys_addr);
 
 	sysmap->smart_dsp_os_priv_area.size = dsp_private_size;
@@ -251,7 +302,7 @@ int get_het_sys_map(sys_map_t *sysmap)
 	if (sysmap->sh_ctrl_area.phys_addr < SHARED_CTRL_AREA_START_ADDR)
 		sysmap->sh_ctrl_area.phys_addr = SHARED_CTRL_AREA_START_ADDR;
 
-	pr_info("IPC: shared_ctrl_addr - %#lx\n",
+	pr_info("IPC: shared_ctrl_addr - %#llx\n",
 		sysmap->sh_ctrl_area.phys_addr);
 
 	sysmap->sh_ctrl_area.size = shared_ctrl_size;
@@ -269,7 +320,7 @@ int get_het_sys_map(sys_map_t *sysmap)
 		sysmap->dsp_core1_m2.phys_addr = DSP_CORE1_M2;
 		sysmap->dsp_core1_m2.size = DSP_CORE1_M2_SZ;
 #endif
-		pr_info("IPC: M2 and M3 exist in star core\n");
+		pr_debug("IPC: M2 and M3 exist in star core\n");
 		sysmap->dsp_m3.phys_addr = DSP_M3;
 		sysmap->dsp_m3.size = DSP_M3_SZ;
 	}
@@ -336,7 +387,6 @@ static int het_mgr_ioctl(struct inode *inode, struct file *filp,
 	mem_range_t r;
 	hw_sem_info_t	hinfo;
 	hw_sem_t	hwsem;
-
 	switch (cmd) {
 
 	case IOCTL_HET_MGR_GET_SYS_MAP:
@@ -443,6 +493,10 @@ static const struct file_operations het_mgr_fops = {
 	.unlocked_ioctl =  	het_mgr_ioctl,
 #else
 	.ioctl =  	het_mgr_ioctl,
+#endif
+
+#ifdef CONFIG_COMPAT
+	.compat_ioctl =  	het_mgr_ioctl,
 #endif
 };
 
