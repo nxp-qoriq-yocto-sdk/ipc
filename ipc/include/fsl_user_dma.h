@@ -1,8 +1,7 @@
 /*
  * @fsl_user_dma.h
  *
- * Copyright (c) 2011-2013
- *  Freescale Semiconductor Inc.
+ * Copyright (c) 2011-2013 Freescale Semiconductor Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -62,7 +61,7 @@ fsl_udma_t fsl_uspace_dma_init(mem_range_t dma_list_mem, mem_range_t pa_ccsr,
  * length	- 	length of the src buffer
  *
 *****************************************************************************/
-int fsl_uspace_dma_add_entry(unsigned long src, unsigned long dest,
+int fsl_uspace_dma_add_entry(unsigned long src, uint64_t dest,
 				uint32_t length, fsl_udma_t udma);
 /*****************************************************************************
  * @fsl_uspace_dma_start

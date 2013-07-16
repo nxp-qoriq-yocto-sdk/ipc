@@ -24,6 +24,7 @@
 
 #define BSC9132_MODEL_STR	"fsl,bsc9132"
 #define B4860QDS_MODEL_STR	"fsl,B4860QDS"
+#define SIZE_4GB       (0x100000000)
 
 #define SMAP(I, A, B, C) do {	\
 			priv->map[I].phys_addr = A;   \
@@ -425,24 +426,35 @@ unsigned long fsl_usmmgr_v2p(void *vaddr, fsl_usmmgr_t usmmgr)
 
 	return paddr;
 }
-
+#ifdef B913x
 void *fsl_usmmgr_p2v(unsigned long phys_addr, fsl_usmmgr_t usmmgr)
+#else
+void *fsl_usmmgr_p2v(uint64_t phys_addr, fsl_usmmgr_t usmmgr)
+#endif
 {
 	int i;
 	void *vaddr = NULL;
+	uint32_t phys_offset = 0;
+
 	ENTER();
-	debug_print("%x \n", phys_addr);
 	usmmgr_priv *priv = (usmmgr_priv *)usmmgr;
 
-	vaddr = shm_ptov((void *) phys_addr);
-	if (vaddr)
-		goto end;
+	if (phys_addr < SIZE_4GB) {
+		phys_offset = (uint32_t)phys_addr;
+		vaddr = shm_ptov((void *)phys_offset);
+		if (vaddr)
+			goto end;
+	}
 
 	for (i = 0; i < priv->mapidx; i++)
 		if (phys_addr >= priv->map[i].phys_addr &&
-			phys_addr < priv->map[i].phys_addr + priv->map[i].size)
-			vaddr = (void *)(phys_addr - priv->map[i].phys_addr) +
-				(unsigned long)priv->map[i].vaddr;
+			phys_addr < priv->map[i].phys_addr +
+			priv->map[i].size) {
+				phys_offset =
+				(uint32_t)(phys_addr - priv->map[i].phys_addr);
+				vaddr = (void *)(phys_offset +
+					(unsigned long)priv->map[i].vaddr);
+		}
 end:
 	EXIT(vaddr);
 	return vaddr;

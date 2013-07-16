@@ -92,7 +92,7 @@ void channel67_thread(void *ptr)
 		pthread_exit(0);
 	}
 
-	printf("range of free pool P=%lx V=%p S=%x\n", r.phys_addr, r.vaddr,
+	printf("range of free pool P=%llx V=%p S=%x\n", r.phys_addr, r.vaddr,
 	       r.size);
 	ret = fsl_ipc_configure_txreq(6, r.phys_addr + 0x100000, 1024*2, ipc);
 	if (ret) {
@@ -141,7 +141,7 @@ void channel67_thread(void *ptr)
 			ret =
 			    fsl_ipc_send_tx_req(6, &lst, &fapi_msg, 1020, ipc);
 			    usleep(10000);
-			first = 0;
+			    first = 0;
 		} while (ret == -ERR_CHANNEL_FULL);
 		if (ret) {
 			printf("\n ERROR ret %x \n", ret);
@@ -181,7 +181,6 @@ void test_init(int rat_id)
 	mem_range_t dsp_ccsr;
 	mem_range_t pa_ccsr;
 	char uio_interface[12];
-	int uio_num;
 
 	ENTER();
 	printf("\n=========$IPC TEST Channel 67$====%s %s====\n", __DATE__,
@@ -214,10 +213,7 @@ void test_init(int rat_id)
 
 	printf("Enter uio_interface you want to use\n like:\n /dev/uio0\n");
 	scanf("%s", uio_interface);
-	uio_num = atoi(&uio_interface[8]);
-	if ((memcmp(uio_interface, "/dev/uio", 8) != 0) ||
-		   uio_num > 3 || uio_num < 0 ||
-		   (strlen(uio_interface) != 9)) {
+	if (memcmp(uio_interface, "/dev/uio", 8) != 0) {
 		printf("Wrong interface\n");
 		exit(-1);
 	}

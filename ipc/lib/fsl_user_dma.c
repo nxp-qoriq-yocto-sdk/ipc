@@ -1,8 +1,7 @@
 /*
  * @fsl_user_dma.c
  *
- * Copyright (c) 2011-2013
- *  Freescale Semiconductor Inc.
+ * Copyright (c) 2011-2013 Freescale Semiconductor Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -94,9 +93,9 @@ typedef struct {
 *****************************************************************************/
 typedef struct {
 	uint32_t sattr;
-	unsigned long src;
+	uint32_t src;
 	uint32_t dattr;
-	unsigned long dest;
+	uint32_t dest;
 	uint32_t enlndar;
 	uint32_t nlndar;
 	uint32_t length;
@@ -125,7 +124,6 @@ fsl_udma_t fsl_uspace_dma_init(mem_range_t dma_list_mem, mem_range_t pa_ccsr,
 	if (!dma_priv)
 		goto end;
 
-	debug_print("dma addr = %x\n", (uint32_t) dma);
 	fdma = open(uio_dev_buf, O_RDWR);
 	if (fdma < 0)
 		perror("open fail\n");
@@ -134,6 +132,7 @@ fsl_udma_t fsl_uspace_dma_init(mem_range_t dma_list_mem, mem_range_t pa_ccsr,
 			fdma, 0);
 	if (dma == MAP_FAILED)
 		perror("mmap failed\n");
+	debug_print("dma addr = %x\n", (uint32_t)dma);
 
 	dma_priv->dma =
 	    (volatile dma_regs_t *)((unsigned long)dma + DMA_REG_OFFSET
@@ -142,10 +141,10 @@ fsl_udma_t fsl_uspace_dma_init(mem_range_t dma_list_mem, mem_range_t pa_ccsr,
 	fsl_uspace_dma_list_clear(dma_priv);
 
 	dma_priv->dma->clndar = dma_list_mem.phys_addr;
-	debug_print("Setting dma_priv->dma->clndar = %x\n",
+	debug_print("Setting dma_priv->dma->clndar = %llx\n",
 		    dma_list_mem.phys_addr);
 	memcpy(&dma_priv->dma_list_mem, &dma_list_mem, sizeof(mem_range_t));
-	debug_print("Setting dma_priv->dma->clndar = %x\n",
+	debug_print("Setting dma_priv->dma->clndar = %llx\n",
 		    dma_priv->dma_list_mem.phys_addr);
 end:
 	EXIT(0);
@@ -159,14 +158,15 @@ void fsl_uspace_dma_exit(fsl_udma_t udma)
 		free(dma_priv);
 }
 
-int fsl_uspace_dma_add_entry(unsigned long src, unsigned long dest,
+int fsl_uspace_dma_add_entry(unsigned long src, uint64_t dest,
 		uint32_t length, fsl_udma_t udma)
 {
 	void *dma_curr;
+	uint8_t dma_edad = 0;
 	ENTER();
 	uspace_dma_t *dma_priv = (uspace_dma_t *)udma;
 
-	debug_print("S=%x D=%x L=%x\n", src, dest, length);
+	debug_print("S=%lx D=%lx L=%x\n", src, dest, length);
 	int i = dma_priv->list_index;
 	if (i == MAX_DMA_ENTRIES) {
 		debug_print("Exceeded Mac number of DMA entries !!\n");
@@ -174,8 +174,9 @@ int fsl_uspace_dma_add_entry(unsigned long src, unsigned long dest,
 		return -ERR_DMA_LIST_FULL;
 	}
 
+	dma_edad = ((dest >> 32) & 0x0f);
 	dma_priv->dma_list[i].sattr = DMA_ATTR;
-	dma_priv->dma_list[i].dattr = DMA_ATTR;
+	dma_priv->dma_list[i].dattr = DMA_ATTR | dma_edad;
 	dma_priv->dma_list[i].enlndar = 0;
 	dma_priv->dma_list[i].reserved = 0;
 	dma_priv->dma_list[i].src = src;
@@ -187,7 +188,7 @@ int fsl_uspace_dma_add_entry(unsigned long src, unsigned long dest,
 								      1) *
 							 sizeof(dma_list_t));
 	dma_curr = &dma_priv->dma_list[dma_priv->list_index];
-	debug_print("DMA ENTRY Addr=%x S=%x D=%x L=%x NL=%x \n",
+	debug_print("DMA ENTRY Addr=%llx S=%x D=%x L=%x NL=%x \n",
 		    dma_priv->dma_list_mem.phys_addr + (i) * sizeof(dma_list_t),
 		    dma_priv->dma_list[i].src, dma_priv->dma_list[i].dest,
 		    dma_priv->dma_list[i].length, dma_priv->dma_list[i].nlndar);
@@ -240,7 +241,7 @@ int fsl_uspace_dma_start(fsl_udma_t udma)
 	asm("sync");
 
 	dma_priv->dma->eclndar = 0;
-	debug_print("Setting dma_priv->dma->clndar = %x\n",
+	debug_print("Setting dma_priv->dma->clndar = %llx\n",
 		    dma_priv->dma_list_mem.phys_addr);
 	dma_priv->dma->clndar = dma_priv->dma_list_mem.phys_addr;
 	asm("isync");

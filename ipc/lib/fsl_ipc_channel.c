@@ -37,8 +37,12 @@ int ch_semid[TOTAL_IPC_CHANNELS];
 /*********** Defines ******************/
 #define MAX_MSG_SIZE 1020
 #define PAGE_SIZE 4096
+#ifdef B913x
 #define GCR_OFFSET 0x17000
-
+#endif
+#ifdef B4860
+#define GCR_OFFSET 0x8F2000
+#endif
 #define SH_CTRL_VADDR(A) \
 	(void *)((unsigned long)(A) \
 			- (ipc_priv->sh_ctrl_area.phys_addr) \
@@ -336,6 +340,9 @@ int fsl_ipc_send_tx_req(uint32_t channel_id, sg_list_t *sgl,
 	void				*vaddr;
 	unsigned long			phys_addr;
 	unsigned long			phys_addr2;
+#ifdef B4860
+	uint64_t			phys_addr3;
+#endif
 	os_het_ipc_bd_t			*bd_base;
 	os_het_ipc_bd_t			*bd;
 	os_het_ipc_channel_t		*ipc_ch;
@@ -396,9 +403,10 @@ int fsl_ipc_send_tx_req(uint32_t channel_id, sg_list_t *sgl,
 	debug_print("copying %x to %x length %x\n", ((unsigned long)vaddr +
 				MAX_TX_REQ_MSG_SIZE), phys_addr,
 			sizeof(unsigned long));
+	/* size is 4 since lbuff address is never greater than 4GB
+	 * of MSG type channel*/
 	memcpy((void *)((unsigned long)vaddr + MAX_TX_REQ_MSG_SIZE),
-			&phys_addr, sizeof(unsigned long));
-
+			&phys_addr, 4);
 	ctr = 0;
 	while (sgl->entry[ctr].is_valid) {
 		debug_print("%x %x %x\n", sgl->entry[ctr].is_valid,
@@ -421,35 +429,35 @@ int fsl_ipc_send_tx_req(uint32_t channel_id, sg_list_t *sgl,
 	incr1 = ipc_ch->tracker.producer_num + 1;
 	incr2 = (ipc_ch->LOCAL_PRODUCER_NUM + 1) % ipc_ch->bd_ring_size;
 
-	debug_print("## Writing P=%x V=%x #=%x\n",
+	debug_print("## Writing P=%lx V=%p #=%x\n",
 			phys_addr, vaddr, incr1);
 	/* Add producer increment */
 	memcpy(vaddr, &incr1, sizeof(uint32_t));
 	/* Get physical address of producer_num */
 	phys_addr2 = get_channel_paddr(channel_id, ipc_priv);
-	debug_print("TXREQ 0: %x %x\n", phys_addr2, channel_id);
+	debug_print("TXREQ 0: %lx %x\n", phys_addr2, channel_id);
 	phys_addr2 += (unsigned long)&ipc_ch->tracker.producer_num -
 		(unsigned long)ipc_ch;
-	debug_print("TXREQ: PIaddr=%x val=%x\n",
+	debug_print("TXREQ: PIaddr=%lx val=%lx\n",
 			phys_addr2, phys_addr);
 
 	fsl_uspace_dma_add_entry(phys_addr, phys_addr2,
-			sizeof(unsigned long), ipc_priv->udma);
+			4, ipc_priv->udma);
 
 	/* Get physical address of LOCAL_PRODUCER_NUM */
 	memcpy((void *)((unsigned long)vaddr + 4), &incr2, sizeof(incr2));
-	debug_print("## Writing V=%x P=%x #=%x\n",
+	debug_print("## Writing V=%lx P=%p #=%x\n",
 			phys_addr + 4, vaddr + 4, incr2);
 
 	phys_addr2 = get_channel_paddr(channel_id, ipc_priv);
-	debug_print("TXREQ 0: %x %x\n", phys_addr2, channel_id);
+	debug_print("TXREQ 0: %lx %x\n", phys_addr2, channel_id);
 
 	phys_addr2 += (unsigned long)&ipc_ch->LOCAL_PRODUCER_NUM -
 		(unsigned long)ipc_ch;
-	debug_print("TXREQ: PILaddr=%x val=%x\n", phys_addr2, phys_addr);
+	debug_print("TXREQ: PILaddr=%lx val=%lx\n", phys_addr2, phys_addr);
 
 	fsl_uspace_dma_add_entry(phys_addr + 4, phys_addr2,
-			sizeof(unsigned long), ipc_priv->udma);
+			4, ipc_priv->udma);
 
 	/* VIRQ geneartion */
 	if (ipc_ch->ipc_ind == OS_HET_VIRTUAL_INT) {
@@ -457,16 +465,24 @@ int fsl_ipc_send_tx_req(uint32_t channel_id, sg_list_t *sgl,
 			ipc_ch->ind_offset;
 		memcpy(((void *)(unsigned long)vaddr + 8), &ipc_ch->ind_value,
 				sizeof(ipc_ch->ind_value));
-		debug_print("TXREQ: INDaddr=%x val=%x\n",
-				phys_addr2, phys_addr);
-
+		debug_print("TXREQ: INDaddr=%lx val=%p %p\n",
+				phys_addr2, (void *)(long)vaddr+8, vaddr);
+		debug_print("TXREQ: ipc_ch->ind_value=%x size %x\n",
+				ipc_ch->ind_value, sizeof(ipc_ch->ind_value));
+#ifdef B913x
 		fsl_uspace_dma_add_entry(phys_addr + 8, phys_addr2,
-				sizeof(unsigned long), ipc_priv->udma);
+				4, ipc_priv->udma);
+#endif
+#ifdef B4860
+		phys_addr3 = ipc_priv->dsp_ccsr.phys_addr + GCR_OFFSET +
+			ipc_ch->ind_offset;
+		fsl_uspace_dma_add_entry(phys_addr + 8, phys_addr3,
+				4, ipc_priv->udma);
+#endif
 	}
 
 	fsl_uspace_dma_start(ipc_priv->udma);
 	ipc_priv->txreq_inprocess = 1;
-
 end:
 	if (locked)
 		fsl_ipc_unlock(ch_semid[channel_id]);
@@ -708,14 +724,11 @@ int fsl_ipc_send_msg(uint32_t channel_id, void *src_buf_addr, uint32_t len,
 
 	/* virtual address of the bd_ring pointed to by bd_base(phys_addr) */
 	bd_base = SH_CTRL_VADDR(ipc_ch->bd_base);
-	debug_print("V= %x P=%x \n", ipc_ch->bd_base, bd_base);
 
 
 	/*OLD bd = &bd_base[ipc_ch->tracker.producer_num];*/
 	bd = &bd_base[ipc_ch->LOCAL_PRODUCER_NUM];
 
-	debug_print("Vaddr = %x n\n", (uint32_t)bd);
-	debug_print("MSG PTR = %x n\n", (uint32_t)bd->msg_ptr);
 	/* get the virtual address of the msg ring */
 	vaddr =  (*ipc_priv->p2vcb)(bd->msg_ptr);
 	if (!vaddr) {
@@ -723,8 +736,7 @@ int fsl_ipc_send_msg(uint32_t channel_id, void *src_buf_addr, uint32_t len,
 		EXIT(ret);
 		goto end;
 	}
-	debug_print("Address of msg P=%x V= %x\n",
-			bd->msg_ptr, (uint32_t)vaddr);
+
 	memcpy(vaddr, src_buf_addr, len);
 	bd->msg_len = len;
 
@@ -787,7 +799,6 @@ int fsl_ipc_recv_ptr(uint32_t channel_id, unsigned long *addr, uint32_t *len,
 
 	*addr = (unsigned long)bd->msg_ptr;
 	*len = bd->msg_len;
-
 	OS_HET_INCREMENT_CONSUMER(ipc_ch);
 	ipc_ch->LOCAL_CONSUMER_NUM = (ipc_ch->LOCAL_CONSUMER_NUM + 1) %
 		ipc_ch->bd_ring_size;
@@ -962,53 +973,6 @@ void generate_indication(os_het_ipc_channel_t *ipc_ch,
 		memcpy(addr, &value, sizeof(value));
 	}
 	EXIT(0);
-}
-
-uint32_t ipc_get_free_rt_signal(void)
-{
-	int free_sig = 0, i, rc;
-	struct sigaction old;
-
-	for (i = (SIGRTMIN + 4); i < SIGRTMAX ; i++) {
-		rc = sigaction(i, NULL, &old);
-		if (rc < 0)
-			continue;
-		if (old.sa_handler == SIG_IGN || old.sa_handler == SIG_DFL) {
-			free_sig = i;
-			break;
-		}
-	}
-	return free_sig;
-}
-
-void signal_handler(int signo, siginfo_t *siginfo, void *data)
-{
-	int i;
-	os_het_ipc_channel_t 	*ipc_ch;
-	os_het_ipc_bd_t	*bd_base;
-	os_het_ipc_bd_t	*bd;
-	void		*context;
-
-	ipc_channel_us_t *ch 		= NULL;
-	ipc_userspace_t	*ipc_priv = (ipc_userspace_t *)data;
-
-	for (i = 0; i < ipc_priv->num_channels; i++) {
-		ch = ipc_priv->channels[i];
-		if (ch->signal == signo)
-			break;
-	}
-	if (ch) {
-		ipc_ch = get_channel_vaddr(ch->channel_id, ipc_priv);
-		bd_base = SH_CTRL_VADDR(ipc_ch->bd_base);
-		bd	= &bd_base[ipc_ch->LOCAL_CONSUMER_NUM];
-
-		if (ipc_ch->ch_type == OS_HET_IPC_MESSAGE_CH)
-			context	= (*ipc_priv->p2vcb)(bd->msg_ptr);
-		else
-			context = (void *)bd->msg_ptr;
-		if (ch->cbfunc)
-			(*ch->cbfunc)(ch->channel_id, context, bd->msg_len);
-	}
 }
 
 /*
@@ -1194,7 +1158,12 @@ int fsl_ipc_reinit(fsl_ipc_t ipc)
 		ipc_ch->ind_value = 0;
 		ipc_ch->pa_reserved[0] = 0;
 		ipc_ch->pa_reserved[1] = 0;
+#ifdef B913x
 		ipc_ch->semaphore_pointer = NULL;
+#endif
+#ifdef B4860
+		ipc_ch->semaphore_pointer = 0;
+#endif
 #if DEBUG_RELOAD
 		dump_ipc_channel(ipc_ch);
 #endif

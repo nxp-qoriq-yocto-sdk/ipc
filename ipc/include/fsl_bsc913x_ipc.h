@@ -22,13 +22,7 @@ O	- Optional
 
 /* Defines */
 /*****************************************************************************/
-#ifdef B913x
 #define MAX_TX_REQ_MSG_SIZE 1020
-#endif
-
-#ifdef B4860
-#define MAX_TX_REQ_MSG_SIZE 1016
-#endif
 
 #define MAX_SG_ENTRIES 128
 /*****************************************************************************/

@@ -58,7 +58,7 @@ static int reset_ppc_ready(void *);
 static int check_dsp_boot(void *);
 static void cleanup(int, int);
 
-void func_add2map(void *dsp_bt, unsigned long phys, uint32_t sz)
+void func_add2map(void *dsp_bt, uint64_t phys, uint32_t sz)
 {
 
 	int i = ((dsp_bt_t *)dsp_bt)->map_id;
@@ -75,42 +75,79 @@ void func_add2map(void *dsp_bt, unsigned long phys, uint32_t sz)
 void dump_sys_map(sys_map_t het_sys_map)
 {
 	printf("SYSTEM MAP\n");
-	printf("DSP PrivArea: Addr=%lx Size=%x\n",
+	printf("DSP PrivArea: Addr=%llx Size=%x\n",
 		het_sys_map.smart_dsp_os_priv_area.phys_addr,
 		het_sys_map.smart_dsp_os_priv_area.size);
 
-	printf("Shared CtrlArea: Addr=%lx Size=%x\n",
+	printf("Shared CtrlArea: Addr=%llx Size=%x\n",
 		het_sys_map.sh_ctrl_area.phys_addr,
 		het_sys_map.sh_ctrl_area.size);
 
-	printf("DSP Core0 M2: Addr=%lx Size=%x\n",
+	printf("DSP Core0 M2: Addr=%llx Size=%x\n",
 		het_sys_map.dsp_core0_m2.phys_addr,
 		het_sys_map.dsp_core0_m2.size);
 
-	printf("DSP Core1 M2: Addr=%lx Size=%x\n",
+	printf("DSP Core1 M2: Addr=%llx Size=%x\n",
 		het_sys_map.dsp_core1_m2.phys_addr,
 		het_sys_map.dsp_core1_m2.size);
 
-	printf("DSP M3: Addr=%lx Size=%x\n",
+	printf("DSP M3: Addr=%llx Size=%x\n",
 		het_sys_map.dsp_m3.phys_addr,
 		het_sys_map.dsp_m3.size);
 
-	printf("PA CCSRBAR: Addr =%lx Size=%x\n",
+	printf("PA CCSRBAR: Addr =%llx Size=%x\n",
 		het_sys_map.pa_ccsrbar.phys_addr,
 		het_sys_map.pa_ccsrbar.size);
 
-	printf("DSP CCSRBAR: Addr =%lx Size=%x\n",
+	printf("DSP CCSRBAR: Addr =%llx Size=%x\n",
 		het_sys_map.dsp_ccsrbar.phys_addr,
 		het_sys_map.dsp_ccsrbar.size);
 }
 
-void *map_area(unsigned long phys_addr, unsigned long  *sz, void *dsp_bt)
+void *map_area(uint64_t phys_addr, uint32_t  *sz, void *dsp_bt)
 {
 	int i;
 	void *vaddr = NULL;;
-	unsigned long diff;
+	uint64_t diff;
 	int size = *sz;
-	unsigned long nphys_addr;
+	uint64_t nphys_addr;
+	int dev_mem = ((dsp_bt_t *)dsp_bt)->dev_mem;
+	int mapidx = ((dsp_bt_t *)dsp_bt)->map_id;
+
+	nphys_addr = phys_addr & MAP_AREA_MASK;
+	if (phys_addr + size > nphys_addr + 0x1000)
+		size = (size + 0x1000) & MAP_AREA_MASK;
+
+	size += 0x1000 - size % 0x1000;
+	diff = phys_addr - nphys_addr;
+
+	for (i = 0; i < mapidx; i++)
+		if (phys_addr >= ((dsp_bt_t *)dsp_bt)->map_d[i].phys_addr &&
+		    phys_addr < ((dsp_bt_t *)dsp_bt)->map_d[i].phys_addr +
+		    ((dsp_bt_t *)dsp_bt)->map_d[i].size) {
+			vaddr = mmap(0, size, (PROT_READ | \
+				PROT_WRITE), MAP_SHARED, \
+					dev_mem, nphys_addr);
+			break;
+		}
+
+	if (vaddr) {
+		*sz = size;
+		vaddr += diff;
+		return vaddr;
+	}
+
+	return NULL;
+
+}
+
+void *map_area64(uint64_t phys_addr, uint64_t  *sz, void *dsp_bt)
+{
+	int i;
+	void *vaddr = NULL;;
+	uint64_t diff;
+	int size = *sz;
+	uint64_t nphys_addr;
 	int dev_mem = ((dsp_bt_t *)dsp_bt)->dev_mem;
 	int mapidx = ((dsp_bt_t *)dsp_bt)->map_id;
 
@@ -143,7 +180,7 @@ void *map_area(unsigned long phys_addr, unsigned long  *sz, void *dsp_bt)
 
 void unmap_area(void *vaddr, uint64_t size)
 {
-	munmap((void *)((unsigned long)vaddr & MAP_AREA_MASK), size);
+	munmap((void *)((uint32_t)vaddr & VIR_ADDR32_MASK), size);
 }
 
 /*
@@ -261,7 +298,6 @@ static int init_hetmgr()
 		printf("Error: Cannot open /dev/het_mgr\n");
 		return  -1;
 	}
-	reload_print("dev_het_mgr =%d\n", dev_het_mgr);
 	return dev_het_mgr;
 }
 
@@ -276,6 +312,7 @@ static int assign_memory_areas(void *dsp_bt)
 	sys_map_t het_sys_map = ((dsp_bt_t *)dsp_bt)->het_sys_map;
 
 	dump_sys_map(het_sys_map);
+
 	if ((het_sys_map).smart_dsp_os_priv_area.phys_addr == 0xffffffff ||
 	    (het_sys_map).dsp_core0_m2.phys_addr == 0xffffffff ||
 	    (het_sys_map).dsp_core1_m2.phys_addr == 0xffffffff ||
@@ -298,8 +335,8 @@ static int assign_memory_areas(void *dsp_bt)
 		(het_sys_map).pa_ccsrbar.size);
 	func_add2map(dsp_bt, (het_sys_map).dsp_ccsrbar.phys_addr,
 		(het_sys_map).dsp_ccsrbar.size);
-	return ret;
 
+	return ret;
 }
 
 static int load_dsp_image(char *fname, void *dsp_bt)
@@ -311,10 +348,10 @@ static int load_dsp_image(char *fname, void *dsp_bt)
 
 	FILE *dspbin;
 	uint8_t endian;
-	unsigned long addr, size;
+	uint64_t addr;
 	void *vaddr;
 	int ret = 0;
-	unsigned long tsize = 0;
+	uint64_t tsize = 0, size;
 	dspbin = fopen(fname, "rb");
 	if (!dspbin) {
 		printf("%s File not found, exiting", fname);
@@ -351,7 +388,7 @@ static int load_dsp_image(char *fname, void *dsp_bt)
 		if (addr == 0xffffffffffffffff && size == 8) {
 			ret = fread(&((dsp_bt_t *)dsp_bt)->intvec_addr,
 				ADDR_SIZE, 1, dspbin);
-			printf("intvec_addr =%lx in L1 Binary\n",
+			printf("intvec_addr =%llx in L1 Binary\n",
 				((dsp_bt_t *)dsp_bt)->intvec_addr);
 			if (!ret) {
 				if (ferror(dspbin))
@@ -361,15 +398,17 @@ static int load_dsp_image(char *fname, void *dsp_bt)
 			}
 			continue;
 		}
-		vaddr = map_area(addr, &tsize, dsp_bt);
+		vaddr = map_area64(addr, &tsize, dsp_bt);
 		if (!vaddr) {
 			ret = -1;
 			printf("\n Error in mapping physical address"
-			" %lx to virtual address in %s\n", addr, __func__);
+			" %llx to virtual address in %s\n",
+			(long long unsigned int)addr, __func__);
 			goto end_close_file;
 		}
 
-		printf("\n Copy Part %lx %lx\n", addr, size);
+		printf("\n Copy Part %llx %llx\n", (long long unsigned int)addr,
+			       (long long unsigned int)size);
 			ret = copy_file_part(vaddr, size, dspbin);
 			unmap_area(vaddr, tsize);
 			ret = 0;
@@ -393,17 +432,17 @@ static int dsp_ready_check(void *dsp_bt)
 	int ret;
 	uint32_t val;
 	ret = 0;
-	unsigned long tsize = 4;
+	uint32_t tsize = 4;
 	sys_map_t *het_sys_map = &((dsp_bt_t *)dsp_bt)->het_sys_map;
 
-	unsigned long phys_addr = (*het_sys_map).pa_ccsrbar.phys_addr + DSPSR;
+	uint64_t phys_addr = (*het_sys_map).pa_ccsrbar.phys_addr + DSPSR;
 	vaddr = map_area(phys_addr, &tsize, dsp_bt);
 	if (!vaddr) {
-		printf("\nError in mapping physical address %lx to virtual"
+		printf("\nError in mapping physical address %llx to virtual"
 		       "address\n", phys_addr);
 		return -1;
 	}
-	reload_print("%s physical address %lx to virtual address %lx\n",
+	reload_print("%s physical address %llx to virtual address %lx\n",
 			__func__, phys_addr, (long)vaddr);
 	val = *((volatile uint32_t *)vaddr);
 	unmap_area((void *)vaddr, tsize);
@@ -418,7 +457,6 @@ static int dsp_ready_check(void *dsp_bt)
 
 static int set_sh_ctrl_pa_init(int dev_het_mgr)
 {
-	reload_print("%s\n", __func__);
 	return ioctl(dev_het_mgr, IOCTL_HET_MGR_SET_INITIALIZED, 0);
 }
 
@@ -427,16 +465,16 @@ static int set_ppc_ready(void *dsp_bt)
 	reload_print("%s\n", __func__);
 	sys_map_t *het_sys_map = &((dsp_bt_t *)dsp_bt)->het_sys_map;
 	volatile unsigned long *vaddr;
-	unsigned long tsize = 4;
+	uint32_t tsize = 4;
 	/* write to ppc ready */
-	unsigned long phys_addr = (*het_sys_map).dsp_ccsrbar.phys_addr +
+	uint64_t phys_addr = (*het_sys_map).dsp_ccsrbar.phys_addr +
 		DSP_GCR + PASTATE;
 	vaddr = map_area(phys_addr, &tsize, dsp_bt);
 	reload_print("%s: physical address %lx to virtual address\n",
 		__func__ , (*het_sys_map).dsp_ccsrbar.phys_addr
 		+ DSP_GCR + PASTATE);
 	if (!vaddr) {
-		printf("\nError in physical address %lx to virtual"
+		printf("\nError in physical address %llx to virtual"
 		       "address\n",
 		       (*het_sys_map).dsp_ccsrbar.phys_addr +
 		       DSP_GCR + PASTATE);
@@ -466,7 +504,7 @@ static int reset_ppc_ready(void *dsp_bt)
 	vaddr = mmap(0, size, (PROT_READ | PROT_WRITE),
 			MAP_SHARED, dev_mem, phys_addr);
 	if (!vaddr) {
-		printf("\nError in physical address %lx to virtual"
+		printf("\nError in physical address %llx to virtual"
 		       "address\n",
 		       (*het_sys_map).dsp_ccsrbar.phys_addr + DSP_GCR);
 		return -1;
@@ -507,7 +545,7 @@ int send_vnmi_func(void *dsp_bt)
 	int dev_mem = ((dsp_bt_t *)dsp_bt)->dev_mem;
 	volatile void *vaddr;
 	int size = 0x8;
-	unsigned long phys_addr = (*het_sys_map).dsp_ccsrbar.phys_addr +
+	uint64_t phys_addr = (*het_sys_map).dsp_ccsrbar.phys_addr +
 		GIC_VIGR;
 
 	reload_print("het_sys_map.dsp_ccsrbar.phys_addr %x GIC_VIGR%x\n",
@@ -518,7 +556,7 @@ int send_vnmi_func(void *dsp_bt)
 			MAP_SHARED, dev_mem, phys_addr);
 
 	if (!vaddr) {
-		printf("\nError in physical address %lx to virtual"
+		printf("\nError in physical address %llx to virtual"
 		       "address\n",
 		       (*het_sys_map).dsp_ccsrbar.phys_addr + GIC_VIGR);
 		return -1;
@@ -545,16 +583,15 @@ static int init_hugetlb(void *dsp_bt)
 	(shared_area).pa_ipc_shared.phys_addr = (unsigned long)pa_p;
 	(shared_area).pa_ipc_shared.size = MB_256
 				- (*het_sys_map).dsp_shared_size;
-
 	(shared_area).dsp_ipc_shared.phys_addr = (unsigned long)pa_p + MB_256
 					- (*het_sys_map).dsp_shared_size;
 	(shared_area).dsp_ipc_shared.size = (*het_sys_map).dsp_shared_size;
 
-	printf("PA Shared Area: Addr=%lx Size=%x\n",
+	printf("PA Shared Area: Addr=%llx Size=%x\n",
 		(shared_area).pa_ipc_shared.phys_addr,
 		(shared_area).pa_ipc_shared.size);
 
-	printf("DSP Shared Area: Addr=%lx Size=%x\n",
+	printf("DSP Shared Area: Addr=%llx Size=%x\n",
 		(shared_area).dsp_ipc_shared.phys_addr,
 		(shared_area).dsp_ipc_shared.size);
 
@@ -819,18 +856,18 @@ static int release_starcore_B4(void *dsp_bt)
 	sys_map_t *het_sys_map = &((dsp_bt_t *)dsp_bt)->het_sys_map;
 
 	/*map to this value size = 0x1000000*/
-	uint64_t size = (*het_sys_map).pa_ccsrbar.size;
+	uint64_t size = het_sys_map->pa_ccsrbar.size;
 	volatile uint32_t *vaddr = NULL;
 
 	/*map to this value phys_addr = 0xffe000000*/
-	uint64_t phys_addr = (*het_sys_map).pa_ccsrbar.phys_addr;
+	uint64_t phys_addr = het_sys_map->pa_ccsrbar.phys_addr;
 
 	core_id += 4;
 
-	vaddr = map_area(phys_addr, &size, dsp_bt);
+	vaddr = map_area64(phys_addr, &size, dsp_bt);
 	if (!vaddr) {
-		printf("\nError in mapping physical address %lu to virtual"
-		       "address\n", phys_addr);
+		printf("\nError in mapping physical address %llx to virtual"
+		       "address\n", (long long unsigned int)phys_addr);
 		return -1;
 	}
 
@@ -852,7 +889,6 @@ static int release_starcore_B4(void *dsp_bt)
 	asm("lwsync");
 	*(vaddr + GCR_CHMER0) =  0x00003f00;
 	asm("lwsync");
-
 	*(vaddr + DCFG_BRR) |=  1 << core_id;
 	asm("lwsync");
 
@@ -866,7 +902,7 @@ static int release_starcore_B4(void *dsp_bt)
 
 	unmap_area((void *)vaddr, size);
 
-	printf("BSTRL,BSTAR,CDCERO,CHMERO n DCFG_BRR set in %s\n", __func__);
+	printf("BSTRL,BSTAR,CDCERO,CHMERO n DCFG_BRR set now\n");
 	return 0;
 }
 
@@ -883,14 +919,14 @@ int check_dsp_boot_B4(void *dsp_bt)
 	volatile int sem_val = 0;
 	uint32_t hw_sem_offset;
 
-	vaddr = map_area(phys_addr, &size, dsp_bt);
+	vaddr = map_area64(phys_addr, &size, dsp_bt);
 	if (!vaddr) {
-		printf("\nError in mapping physical address %#lx to virtual"
+		printf("\nError in mapping physical address %#llx to virtual"
 		       "address %p\n", phys_addr, vaddr);
 		return -1;
 	}
 
-	if (hw_handshake_sem_no <= 7 && hw_handshake_sem_no >= 0) {
+	if (hw_handshake_sem_no <= 7 && hw_handshake_sem_no >= 1) {
 		hw_sem_offset = SC_BOOT_HW_SEMAPHORE0 + 2 * hw_handshake_sem_no;
 		while (!sem_val) {
 			sem_val = *(vaddr + hw_sem_offset);
@@ -908,6 +944,7 @@ int check_dsp_boot_B4(void *dsp_bt)
 			printf("\n \n == DSP Booted up ==\n");
 		}
 	}
+
 	return 0;
 }
 

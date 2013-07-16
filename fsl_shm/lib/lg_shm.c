@@ -52,10 +52,10 @@ void *shm_vtop(void *ptr)
 	if (shm_init_done == FALSE)
 		return NULL;
 
-	if (!ptr || (ptr < shm.vaddr) || (ptr > (shm.vaddr + shm.size)))
+	__u32 ptr1 = (__u32)ptr;
+	if (!ptr1 || (ptr1 < shm.vaddr) || (ptr1 > (shm.vaddr + shm.size)))
 		return NULL;
-
-	return shm.paddr + (ptr - shm.vaddr);
+	return (void *)(shm.paddr + (ptr1 - shm.vaddr));
 }
 
 /*
@@ -68,10 +68,11 @@ void *shm_ptov(void *ptr)
 	if (shm_init_done == FALSE)
 		return NULL;
 
-	if (!ptr || (ptr < shm.paddr) || (ptr > (shm.paddr + shm.size)))
+	__u32 ptr1 = (__u32)ptr;
+	if (!ptr1 || (ptr1 < shm.paddr) || (ptr1 > (shm.paddr + shm.size)))
 		return NULL;
 
-	return shm.vaddr + (ptr - shm.paddr);
+	return (void *)(shm.vaddr + (ptr1 - shm.paddr));
 }
 
 /*
@@ -84,6 +85,7 @@ void *shm_ptov(void *ptr)
 void *shm_memalign(size_t size, unsigned long align)
 {
 	memalign_req_t req;
+	int ret = 0;
 
 	if (shm_init_done == FALSE)
 		return NULL;
@@ -92,8 +94,10 @@ void *shm_memalign(size_t size, unsigned long align)
 	req.size = size;
 	req.align = align;
 	ioctl(fd, IOCTL_FSL_SHM_MEMALIGN, &req);
+	if (ret == -1)
+		printf("%s: IOCTL_FSL_SHM_MEMALIGN failed\n", __func__);
 
-	return shm_ptov(req.paddr);
+	return shm_ptov((void *)req.paddr);
 }
 
 /*
@@ -105,15 +109,17 @@ void *shm_memalign(size_t size, unsigned long align)
 void *shm_alloc(size_t size)
 {
 	alloc_req_t req;
-
+	int ret = 0;
 	if (shm_init_done == FALSE)
 		return NULL;
 
 	memset(&req, 0, sizeof(alloc_req_t));
 	req.size = size;
-	ioctl(fd, IOCTL_FSL_SHM_ALLOC, &req);
+	ret = ioctl(fd, IOCTL_FSL_SHM_ALLOC, &req);
+	if (ret == -1)
+		printf("%s: IOCTL_FSL_SHM_ALLOC failed\n", __func__);
 
-	return shm_ptov(req.paddr);
+	return shm_ptov((void *)req.paddr);
 }
 
 /*
@@ -123,11 +129,14 @@ void *shm_alloc(size_t size)
 void shm_free(void *ptr)
 {
 	unsigned long addr;
+	int ret = 0;
 	addr = (unsigned long)shm_vtop(ptr);
 	if (!addr)
 		return;
 
 	ioctl(fd, IOCTL_FSL_SHM_FREE, &addr);
+	if (ret == -1)
+		printf("%s: IOCTL_FSL_SHM_FREE failed\n", __func__);
 }
 
 /*
@@ -139,6 +148,7 @@ void shm_free(void *ptr)
 void *fsl_shm_init(size_t dsp_shared_size)
 {
 	int shmid;
+	int ret = 0;
 
 	fd = open(DEV_FILE, O_RDONLY);
 	if (fd < 0) {
@@ -155,8 +165,8 @@ void *fsl_shm_init(size_t dsp_shared_size)
 	}
 
 	memset(&shm, 0, sizeof(shm_seg_t));
-	shm.vaddr = shmat(shmid, 0, 0);
-	if (shm.vaddr == (char *)-1) {
+	shm.vaddr = (__u32)shmat(shmid, 0, 0);
+	if (shm.vaddr == -1) {
 		perror("Shared memory attach failure");
 		shmctl(shmid, IPC_RMID, NULL);
 		close(fd);
@@ -164,9 +174,11 @@ void *fsl_shm_init(size_t dsp_shared_size)
 	}
 
 	shm.size = HUGE_PAGE_256M - dsp_shared_size;
-	ioctl(fd, IOCTL_FSL_SHM_INIT, &shm);
+	ret = ioctl(fd, IOCTL_FSL_SHM_INIT, &shm);
+	if (ret == -1)
+		printf("%s: IOCTL_FSL_SHM_INIT failed\n", __func__);
 
 	shm_init_done = TRUE;
 
-	return shm.paddr;
+	return (void *)shm.paddr;
 }

@@ -4,7 +4,7 @@ HET_DIR=$(KERNEL_DIR1)
 FSL_SHM_DIR=../fsl_shm/include
 SOURCES= ./dsp_boot.c
 SOURCES_FSL_SHM= ../fsl_shm/lib/lg_shm.c
-CFLAGS= -I $(HET_DIR) -I $(FSL_SHM_DIR) -Wall
+CFLAGS= -I $(HET_DIR) -I $(FSL_SHM_DIR) -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -Wall
 
 ifeq ($(B4860), 1)
   CFLAGS+=-DB4860
@@ -18,7 +18,7 @@ all: fsl_shm lib_dsp_boot dsp_bt
 lib_dsp_boot:
 	$(CC) -c ./libdspboot.c $(CFLAGS) -o ./libdspboot.o
 	$(CC) -shared -fPIC ./libdspboot.o -o libdspboot.so
-#	$(AR) rcs libdspboot.a ./libdspboot.o ../fsl_shm/lib/lg_shm.o
+	$(AR) rcs libdspboot.a ./libdspboot.o ../fsl_shm/lib/lg_shm.o
 fsl_shm:
 	$(CC) -c $(CFLAGS) $(SOURCES_FSL_SHM)
 dsp_bt:

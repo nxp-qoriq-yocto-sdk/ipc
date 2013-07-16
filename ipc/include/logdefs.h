@@ -1,7 +1,6 @@
  /*
  *
- * Copyright (c) 2011-2013
- *  Freescale Semiconductor Inc.
+ * Copyright (c) 2011-2013 Freescale Semiconductor Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,8 +39,9 @@
 #define ENTER()	;
 #define EXIT(A)	;
 #endif
-#define DUMPR(R) printf("P=%lx V=%p S=%x \n", (R)->phys_addr, (R)->vaddr,\
-			(R)->size);
+#define DUMPR(R) printf("P=%llx V=%p S=%x \n",\
+		(long long unsigned int) (R)->phys_addr,\
+		(R)->vaddr, (R)->size);
 #ifdef DBG
 #define debug_print(...)  printf(__VA_ARGS__);
 #else

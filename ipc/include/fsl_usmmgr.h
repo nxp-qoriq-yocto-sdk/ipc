@@ -117,8 +117,11 @@ int fsl_usmmgr_exit(fsl_usmmgr_t usmmgr);
  * usmmgr - handle returned by fsl_usmmgr_init.
  *
 *****************************************************************************/
+#ifdef B913x
 void *fsl_usmmgr_p2v(unsigned long, fsl_usmmgr_t usmmgr);
-
+#else
+void *fsl_usmmgr_p2v(uint64_t, fsl_usmmgr_t usmmgr);
+#endif
 /*****************************************************************************
  * @fsl_usmmgr_v2p
  *

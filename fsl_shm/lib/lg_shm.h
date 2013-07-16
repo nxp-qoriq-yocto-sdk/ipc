@@ -36,26 +36,26 @@ enum bool {
 };
 
 typedef struct shm_seg {
-	void *vaddr;
-	void *paddr;
-	size_t size;
+	__u32 vaddr;
+	__u32 paddr;
+	__u32 size;
 } shm_seg_t;
 
 typedef struct alloc_req {
-	void *paddr;
-	size_t size;
+	__u32 paddr;
+	__u32 size;
 } alloc_req_t;
 
 typedef struct memalign_req {
-	void *paddr;
-	unsigned long align;
-	size_t size;
+	__u32 paddr;
+	__u32 align;
+	__u32 size;
 } memalign_req_t;
 
 #define FSL_MM_MAGIC	'F'
-#define IOCTL_FSL_SHM_INIT	_IOWR(FSL_MM_MAGIC, 1, shm_seg_t *)
-#define IOCTL_FSL_SHM_ALLOC	_IOWR(FSL_MM_MAGIC, 2, alloc_req_t *)
-#define IOCTL_FSL_SHM_MEMALIGN	_IOWR(FSL_MM_MAGIC, 3, memalign_req_t *)
-#define IOCTL_FSL_SHM_FREE	_IOR(FSL_MM_MAGIC, 4, void *)
+#define IOCTL_FSL_SHM_INIT	_IOWR(FSL_MM_MAGIC, 1, __u64)
+#define IOCTL_FSL_SHM_ALLOC	_IOWR(FSL_MM_MAGIC, 2, __u64)
+#define IOCTL_FSL_SHM_MEMALIGN	_IOWR(FSL_MM_MAGIC, 3, __u64)
+#define IOCTL_FSL_SHM_FREE	_IOR(FSL_MM_MAGIC, 4, __u64)
 
 #endif

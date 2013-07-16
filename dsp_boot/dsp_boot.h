@@ -21,7 +21,7 @@ typedef struct{
 	int map_id;
 	sys_map_t het_sys_map;
 	mem_range_t map_d[20];
-	unsigned long intvec_addr;
+	uint64_t intvec_addr;
 	uint32_t core_id;
 	uint32_t semaphore_num;
 

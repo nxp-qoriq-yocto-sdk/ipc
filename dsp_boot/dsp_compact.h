@@ -1,9 +1,18 @@
+/**
+ *** @dsp_boot.h
+ ***
+ *** Copyright 2013 Freescale Semiconductor, Inc.
+ ***
+ *** Author: Ashish Kumar <ashish.kumar@freescale.com>
+ ***/
+
 #ifndef __DSP_COMPACT_H
 #define __DSP_COMPACT_H
 
 #ifdef B4860
 #define ADDR_SIZE 8
 #define MAP_AREA_MASK 0xfffffffffffff000
+#define VIR_ADDR32_MASK 0xfffff000
 
 #define LCC_BSTRH 0x8
 #define LCC_BSTRL 0x9
@@ -19,6 +28,7 @@
 #ifdef B913x
 #define ADDR_SIZE 4
 #define MAP_AREA_MASK 0xfffff000
+#define VIR_ADDR32_MASK 0xfffff000
 #endif
 
 #endif
