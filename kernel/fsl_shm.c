@@ -691,8 +691,12 @@ static int fsl_shm_ioctl(struct inode *inode, struct file *file,
 			ret = -EFAULT;
 			break;
 		}
-
+#ifdef CONFIG_COMPAT
+		/*since arg on 32 will size 4 bytes only */
+		fsl_shm_free((void *)(addr >> 32));
+#else
 		fsl_shm_free((void *)addr);
+#endif
 		break;
 
 	default:
