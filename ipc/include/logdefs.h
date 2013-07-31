@@ -39,13 +39,14 @@
 #define ENTER()	;
 #define EXIT(A)	;
 #endif
+#ifdef DBG
+#define debug_print(...)  printf(__VA_ARGS__);
 #define DUMPR(R) printf("P=%llx V=%p S=%x \n",\
 		(long long unsigned int) (R)->phys_addr,\
 		(R)->vaddr, (R)->size);
-#ifdef DBG
-#define debug_print(...)  printf(__VA_ARGS__);
 #else
 #define debug_print(...)
+#define DUMPR(R) ;
 #endif
 
 #ifdef DEBUG_RELOAD
