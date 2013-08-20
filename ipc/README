@@ -1,181 +1,290 @@
+===============================================================================
+Freescale IPC README
+===============================================================================
+2013 Freescale Semiconductor, Inc. All rights reserved.
+Freescale, the Freescale logo, and CodeWarrior are trademarks of Freescale
+Semiconductor, Inc., Reg. U.S. Pat. & Tm. Off. The Power Architecture and
+Power.org word marks and the Power and Power.org logos and related marks are
+trademarks and service marks licensed by Power.org. All other product or
+service names are the property of their respective owners.
+===============================================================================
+
+Date   : Aug 20, 2013
+Version: 1.0
+
+===============================================================================
 
 Heterogeneous IPC Module
 ------------------------
-IPC module is provided as user space library (libipc.so). Apart from
-providing APIs for L2-L1 communication, a hugepage based user space
-shared memory manager is also provided as a user space library (libmem.so).
-In order to use IPC services, user space application needs to be linked
-with these libraries.
+IPC module is provided as user space library (libipc.so) and loadable kernel modules.
+Apart from providing APIs for L2-L1 communication, a hugepage based user space shared
+memory manager is also provided as a user space library (libmem.so).
+In order to use IPC services, user space application needs to be linked with these libraries.
 
-IPC support for Multiple Application
-------------------------------------
-Support added for accessing an IPC channel by multiple applications, simultaneously.
-This support is disabled by default and can be enabled  during compile time using a
-compilation flag CONFIG_LOCK.
 
-If this support is enabled then, internally, a lock is obtained on IPC channel before
-performing any Rx, Tx operation on that channel. This will be an overhead in case where
-only a single application is using the IPC Module.
+=======================================================================
+
 
 Directory Structure
 -------------------
-ipc/include     -       Include directory for IPC public and private
-                        header files
-ipc/lib         -       Source code of IPC, user space ipc helper
-                        memory manager, user space dma driver
-fsl_shm         -       Source code of user space Shared Memory Manager
-dsp_boot        -       Source code of DSP boot loader
-test            -       Reference Test application which uses IPC channels
+ipc/include  - Include directory for IPC public and private header
+               files
+ipc/lib      - Source code of IPC, user space ipc helper memory
+               manager, user space dma driver
+fsl_shm      - Source code of user space Shared Memory Manager
+dsp_boot     - Source code of DSP boot loader
+test         - Reference Test application which uses IPC channels
+Kernel       - It contains the IPC kernel code. Compilation will
+               generate three kernel loadable modules namely,
+               hetmgr.ko, ipc.ko and shm.ko
+
+=======================================================================
 
 Compilation Procedure
 ---------------------
-1. Set KERNEL_DIR as the path of linux soruce code
-2. Set CROSS_COMPILE as the <path of toolchain>/.../powerpc-linux-gnu-
-3. run make
-4. libipc.so, libmem.so, ipc_test,
-	      ipc_test67, dump_mem - gets created under ipc directory ,
-	      libdspboot.so copied from dsp_boot directory
-	      dsp_bt, libdspboot.so - gets created under
-			     dsp_boot directory
-5. For enabling access of IPC channel by multiple application, pass "CONFIG_LOCK=1"
-flag as an argument to make as follows:
-     make CONFIG_LOCK=1
+Following needs to be modified in kernel image before booting Linux:
+Enable the DMA UIO user driver in kernel so to access DMA channel from user space and disable kernel dma engine.
+        Disable the Kernel dma engine.
+        [ ] DMA Engine support  --->
 
-bootargs Required
------------------
-Please set following bootargs, shown as example:
-default_hugepagesz=256m
-hugepagesz=256m
-hugepages=1
-max_num_ipc_channels=64
-max_channel_depth=16
+        Enable Userspace's I/O driver
+        Device Drivers  --->
+               <*> Userspace I/O drivers  --->
+                    <*> Freescale DMA support
+
+I. Kernel loadable modules:
+   1. cd ipc/kernel
+   2. Set KERNEL_DIR as the path of Linux source code
+   3. Set CROSS_COMPILE as the <path of toolchain>/.../powerpc-linux-gnu- (toolchain should be 64 bit toolchain)
+   4. run make B4860=1
+        This will generate the hetmgr.ko, ipc.ko and shm.ko.
+        Install the ".ko" with the following command after the Linux is booted.
+        Run step 5 only if you want to build kernel modules for multirat applications
+   5. run make clean; make B4860=1 CONFIG_MULTI_RAT=1
+
+II. User space code:
+   1. cd ipc
+   2. Set CROSS_COMPILE as the <path of toolchain>/.../powerpc-linux-gnu- (toolchain should be 32 bit toolchain)
+   3. make B4860=1
+   4. Following user space libraries and binaries get generated:
+      1. under ipc directory
+         - libipc.so,
+         - libmem.so,
+         - ipc_test,
+         - ipc_test67
+
+      2. under dsp_boot directory
+         - libdspboot.so
+         - dsp_bt
+
+=======================================================================
+
+Required u-boot bootargs
+------------------------
+Please append the following in bootargs:
+  - default_hugepagesz=256m
+  - hugepagesz=256m
+  - hugepages=1
+
+Set DDR size visible to Linux.
+  - setenv bootm_size=0x70000000 (any value less than 2 GB is good enough)
+
+=======================================================================
 
 Test Application (Single RAT only Solutions)
 ----------------
-Test applications (ipc_test, ipc_test67) can be started once the DSP image
-(ipc_9132_multimode_dbg.bin/ipc_9131_dbg.bin), present in rootfs under
-/dsp_images is loaded sucessfully by dsp_bt application.
+1. insmod /driver/usr/IPC/single_rat/hetmgr.ko
+     Following modules params can be passed to override their default
+     values:
+       - dsp_shared_size  (default value 0x1000000)
+       - dsp_private_addr (default value 0x80000000)
+       - dsp_private_size (default value 0x7FF00000)
+       - shared_ctrl_addr (default value 0xFFF00000)
+       - shared_ctrl_size (default value 0x100000)
+       - max_num_ipc_channels (default value 64)
+       - max_channel_depth    (default value 16)
 
-Test runs with 6 channels, where for each pair of channels PowerPC is producer
-and DSP is consumer. For each of the channel pairs a seperate thread is
-started by the Linux test application.
+NOTE: Module params are optional, required only when default setting needs to be altered.
 
-The channel pairs are
-2-3	Channel 2 is a MSG Channel where DSP is consumer
-	Channel 3 is a PTR Channel where PowerPC is consumer.
+2. insmod /driver/usr/IPC/single_rat/shm.ko
 
-	Linux sends a message on Channel 2, DSP returns back the pointer of the
-	message on channel 3.
+3. Create device nodes with major number flashed while loading kernel modules
+     mknod /dev/fsl_shm c 250 0
+     mknod /dev/het_mgr c 251 0
 
-	On Channel 2, DSP receives VIRQ
-	On Channel 3, Linux polls for recv pointer.
+4. Populate shmmax value in proc file system
+     echo 0x10000000 > /proc/sys/kernel/shmmax
 
-4-5	Channel 4 is a PTR channel where Linux is a consumer.
-	Channel 5 is a MSG channel where DSP is a consumer.
+5. Command to load SDOS image
 
-	Linux receives a ptr on channel 4, copies the length number of characters
-	from the pointer into a local buffer and sends the buffer on to channel 5.
+    Format
+    ------
+    $ ./dsp_bt <semaphore number> <core number> <SDOS_image>
 
-	On Channel 4, Linux Polls
-	On Channel 5, DSP Polls
+    $ ./dsp_bt 1 0 <SDOS_image>
 
-6-7	Channel 6 is a TX Request Channel where Linux is producer.
-	Channel 7 is a PTR channel were linux is consumer.
+NOTE: If the semaphore number is specified as 0, it means semaphore is not used.
+      Core number specifies the star core number, ranges 0-5.
 
-	Linux sends a dummy TX request fapi message a set of buffer using DMA.
-	DSP returns to linux a pointer which points to a memory location
-	containing first 16 bytes of fapi message and the first buffer.
+6. Test applications (ipc_test, ipc_test67) can be started once the DSP/SDOS image
+   is loaded successfully with the help of dsp loader(dsp_bt).
 
-For channel 2-3,4-5
-$./ipc_test
+   Test runs with the help of 6 IPC channels, where for each pair of channels PowerPC is producer
+   and DSP is consumer. For each of the channel pairs a seperate thread is
+   started by the test application.
 
-For Channel 6-7
-$./ipc_test67
+   The channel pairs are
+        2-3     Channel 2 is a MSG Channel where DSP is consumer
+                Channel 3 is a PTR Channel where PowerPC is consumer.
+
+                Linux sends a message on Channel 2, DSP returns back the pointer of the
+                message on channel 3.
+
+                On Channel 2, DSP receives VIRQ
+                On Channel 3, Linux polls for recv pointer.
+
+        4-5     Channel 4 is a PTR channel where Linux is a consumer.
+                Channel 5 is a MSG channel where DSP is a consumer.
+
+                Linux receives a ptr on channel 4, copies the length number of characters
+                from the pointer into a local buffer and sends the buffer on to channel 5.
+
+                On Channel 4, Linux Polls
+                On Channel 5, DSP Polls
+
+        6-7     Channel 6 is a TX Request Channel where Linux is producer.
+                Channel 7 is a PTR channel were linux is consumer.
+
+                Linux sends a dummy TX request fapi message a set of buffer using DMA.
+                DSP returns to linux a pointer which points to a memory location
+                containing first 16 bytes of fapi message and the first buffer.
+
+   Format
+   ------
+   For channel 2-3,4-5
+   $./ipc_test
+   Usage: ./ipc_test -r <rat_id> -i <nr_msg>
+   whereas,
+   <rat_id> : 0 for SingleRAT
+            : 1 for MultiRAT
+   <nr_msg> : Number of Messages to be exchanged on an IPC channel
+   OR
+   $ ./ipc_test -r 0 -i 20
+
+   For Channel 6-7
+   $./ipc_test67
+   Usage: ./ipc_test67 -r <rat_id> -i <nr_msg>
+   whereas,
+   <rat_id> : 0 for SingleRAT
+            : 1 for MultiRAT
+   <nr_msg> : Number of Messages to be exchanged on an IPC channel
+   OR
+   $ ./ipc_test67 -r 0 -i 20
+
+NOTE: ipc_test67 requires a user input,which is the uio interface corresponding
+      to the DMA channel.
+
+     for Eg:
+        Enter uio_interface you want to use
+        like:
+        /dev/uio0
+
+        /dev/uio0
+
+NOTE: If -i option is not provided the test run till eternity.
+      If -r option is not provided, it take rat_id as 0.
+
+=======================================================================
 
 Test Application (Multi RAT)
-----------------
-ipc_test and ipc_test67 are upgraded for testing multirat support from PA side.
-rat id should be added after the executable name
+----------------------------
+0. Since SDOS cannot be reloaded, reboot the system to load multi rat kernel modules.
 
-Format
-------
-  ./ipc_test <rat_id>
-  ./ipc_test <0/1>
-OR
-  ./ipc_test
+1. insmod /driver/usr/IPC/multi_rat/hetmgr.ko
+     Following modules params can be passed to override their default
+     values:
+       - dsp_shared_size  (default value 0x1000000)
+       - dsp_private_addr (default value 0x80000000)
+       - dsp_private_size (default value 0x7FF00000)
+       - shared_ctrl_addr (default value 0xFFF00000)
+       - shared_ctrl_size (default value 0x100000)
+       - max_num_ipc_channels (default value 64)
+       - max_channel_depth    (default value 16)
 
-For channel 2-3,4-5
-$./ipc_test 1
+NOTE: Module params are optional, required only when default setting needs to be altered.
 
-For Channel 6-7
-$./ipc_test67 1
+2. insmod /driver/usr/IPC/multi_rat/shm.ko
 
-        for eg:
-                ipc_test or ipc_test 0 would run the test for rat_id 0
-                ipc_test 1 would run the test for rat_id 1
+3. Create device nodes with major number flashed while loading kernel modules
+     mknod /dev/fsl_shm c 250 0
+     mknod /dev/het_mgr c 251 0
 
-Note: DSP multi rat enabled binary(ipc_9132_multimode_dbg.bin) must be loaded before
-any pa tests.
+4. Populate shmmax value in proc file system
+     echo 0x10000000 > /proc/sys/kernel/shmmax
 
-Memory Dump
------------
+5. Command to load SDOS Multi-RAT image
 
-dump_mem demo application can be found out in /ipc directory in the rootfile
-system.
-It can dump the Memory contents of address range to a location specified by
-the application.
+    Format
+    ------
+    $ ./dsp_bt <semaphore number> <core number> <SDOS_image> <core number> <SDOS_image> ...
 
-Requirements:
-1. mem_dump_cfg.txt- Memory areas that needs to be dumped are specified in this    file. Each memory area needs to be specified in terms of start address and      size. Multiple discontiguous memory areas can be specified like following:
-   0x37000000 0x100
-   0x38000000 0x200
-2. The address and size should be in hexadecimal format.
-3. The start addresses needs to be page aligned.
+    $ ./dsp_bt 1 0 <SDOS_image> 1 <SDOS_image>
 
-Steps to Run:
-1. cd /ipc
-2. Run ./dump_mem
-3. The output log is generated in the file named Memory_dumped.txt
-4. cat Memory_dumped.txt
-dump_memory_dsp status is (768) 0x300
+NOTE: If the semaphore number is specified as 0, it means semaphore is not used.
+      Core number specifies the star core number, ranges from 0-5.
 
-  fedcba98  fedcba98  00004000  10000000
-  0f000000  1f000000  01000000  3700002c
-  00000000  37000038  37000050  00000040
-  00000010  370000e8  b0022d64  00000960
+6. Test applications (ipc_test, ipc_test67) can be started once the DSP multi rat images
+   are loaded successfully with the help of dsp loader(dsp_bt),present in rootfs under /ipc.
 
-DSP Recovery
-------------
-There is no need to rebot the system completely if some problem occurs at DSP
-side. Now it is possible for L2 to initiate the DSP recovery. Following BSP API
-is available for L2 for performing DSP Recovery:
 
-/*************************************************************************
- * * @fsl_restart_L1
- * *
- * *  Triggers the DSP Recovery and re-loads/start DSP image
- * *
- * * ipc[in] . IPC handle returned by fsl_ipc_init
- * * fname[in] . absolute path of DSP/L1 image to be re-loaded
- * *
- * * Return: On Success, zero is returned
- * *                 On Failure, non-zero value is returned.
- * *
- * * Description
- * * It re-initializes all IPC channels and then generates a VNMI towards DSP
- * * so that DSP can perform recovery. It furthers re-loads and starts the
- * * DSP/L1 image upon receiving `DSP Ready. indication from DSP.
- * ************************************************************************/
-int fsl_restart_L1(fsl_ipc_t ipc, char *fname);
+   ipc_test and ipc_test67 are upgraded for testing multirat support from PA side.
+   rat id should be added after the executable name
 
-DSP Recovery Test Applicationi:
+   Format
+   ------
+   $./ipc_test
+   Usage: ./ipc_test -r <rat_id> -i <nr_msg>
+   whereas,
+   <rat_id> : 0 for SingleRAT
+            : 1 for MultiRAT
+   <nr_msg> : Number of Messages to be exchanged on an IPC channel
+   OR
+   $ ./ipc_test -r 1 -i 20
 
-Format
-------
- ./dsp_recover <rat_id>
- ./dsp_recover <0/1>
-OR
- ./dsp_recover
+   For Channel 6-7
+   $./ipc_test67
+   Usage: ./ipc_test67 -r <rat_id> -i <nr_msg>
+   whereas,
+   <rat_id> : 0 for SingleRAT
+            : 1 for MultiRAT
+   <nr_msg> : Number of Messages to be exchanged on an IPC channel
+   OR
+   $ ./ipc_test67 -r 1 -i 20
 
-  dsp_recover or dsp_recover 0 would run the test for Non-Multi RAT L1
-  dsp_recover 1 would run the test for Multi RAT enabled L1
+NOTE: ipc_test67 requires a user input,which is the uio interface corresponding
+      to the DMA channel.
+
+     for Eg:
+        Enter uio_interface you want to use
+        like:
+        /dev/uio0
+
+        /dev/uio1
+
+NOTE: If -i option is not provided the test run till eternity.
+      If -r option is not provided, it take rat_id as 0.
+
+=======================================================================
+
+SDOS IMAGE FORMAT
+-----------------
+Dsp loader(dsp_bt) expects the SDOS image in the below mentioned format.
+
+       ENDIANESS_BYTE (1Byte)
+       <ADDRESS - 8Bytes><SIZE_IN_BYTES - 8Bytes><data_payload>
+       <ADDRESS - 8Bytes><SIZE_IN_BYTES - 8Bytes><data_payload>
+       <ADDRESS - 8Bytes><SIZE_IN_BYTES - 8Bytes><data_payload>
+       ........
+       <ADDRESS =0xFFFF_FFFF_FFFF_FFFF ><SIZE = 8><__crt0_start address>
+
+       __crt0_start address should be 8k aligned.
