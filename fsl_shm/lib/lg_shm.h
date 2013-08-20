@@ -30,6 +30,8 @@
 #define DEV_FILE	"/dev/fsl_shm"
 #define HUGE_PAGE_256M	0x10000000
 #define LG_SHM_KEY	2
+#define IPC_METADATA_AREA_SZ 0x100000
+#define IPC_METADATA_AREA_PADDR_OFFSET 0xEF00000
 
 enum bool {
 	TRUE, FALSE,

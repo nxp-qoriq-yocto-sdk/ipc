@@ -2,8 +2,8 @@ CC=$(CROSS_COMPILE)gcc
 AR=$(CROSS_COMPILE)ar
 KERNEL_DIR1=$(PWD)/kernel
 HET_DIR=$(KERNEL_DIR1)
-CFLAGS=-Wall -O3 -lpthread -I ./include -I../fsl_shm/include -I $(HET_DIR) -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -Wall
-CFLAGS2=-Wall -I ./include -I../fsl_shm/include -I $(HET_DIR) -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -Wall
+CFLAGS=-Wall -O3 -lpthread -I ./include -I ../fsl_shm/include/ -I ../fsl_shm/lib/ -I ../dsp_boot/ -I $(HET_DIR) -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -Wall
+CFLAGS2=-Wall -I ./include -I ../fsl_shm/lib/  -I ../fsl_shm/include/ -I ../dsp_boot/ -I $(HET_DIR) -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -Wall
 
 ifeq ($(CONFIG_LOCK), 1)
 	CFLAGS+=-DCONFIG_LOCK
@@ -25,8 +25,8 @@ ipc_lib:
 	$(CC) -c ./lib/fsl_user_dma.c $(CFLAGS) -o ./lib/fsl_user_dma.o
 	$(CC) -c ./lib/fsl_ipc_lock.c $(CFLAGS) -o ./lib/fsl_ipc_lock.o
 	$(CC) -c ../dsp_boot/libdspboot.c $(CFLAGS2) -o ../dsp_boot/libdspboot.o
-	$(CC) -shared -fPIC ./lib/fsl_user_dma.o ./lib/fsl_ipc_channel.o ./lib/fsl_ipc_lock.o ../dsp_boot/libdspboot.o -o libipc.so
-	$(AR) rcs libipc.a ./lib/fsl_ipc_channel.o ./lib/fsl_ipc_lock.o ../dsp_boot/libdspboot.o ./lib/fsl_user_dma.o
+	$(CC) -shared -fPIC ./lib/fsl_user_dma.o ./lib/fsl_ipc_channel.o ./lib/fsl_ipc_lock.o ../dsp_boot/libdspboot.o -L../fsl_shm -llg_shm -o libipc.so
+	$(AR) rcs libipc.a ./lib/fsl_ipc_channel.o ./lib/fsl_ipc_lock.o ../dsp_boot/libdspboot.o ./lib/fsl_user_dma.o ../fsl_shm/lib/lg_shm.o
 
 mem_lib:
 	$(CC) -c ./lib/fsl_usmmgr.c $(CFLAGS) -o ./lib/fsl_usmmgr.o

@@ -690,6 +690,11 @@ int pre_load_913x(int count, ...)
 		return -1;
 	}
 
+	if (fsl_913x_ipc_init(dsp_bt)) {
+		printf("error in fsl_913x_ipc_init frm %s\n", __func__);
+		return -1;
+	}
+
 	if (dsp_ready_check(dsp_bt)) {
 		printf("error in dsp_ready_check frm %s\n", __func__);
 		return -1;
@@ -984,6 +989,11 @@ int pre_load_B4(int count, ...)
 	/* get PA shared area and DSP shared AREA*/
 	if (init_hugetlb(dsp_bt)) {
 		printf("error in init_hugetlb frm %s\n", __func__);
+		return -1;
+	}
+
+	if (fsl_B4_ipc_init(dsp_bt)) {
+		printf("error in fsl_B4_ipc_init frm %s\n", __func__);
 		return -1;
 	}
 

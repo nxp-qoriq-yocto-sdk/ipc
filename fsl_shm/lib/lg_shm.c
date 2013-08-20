@@ -173,7 +173,7 @@ void *fsl_shm_init(size_t dsp_shared_size)
 		return NULL;
 	}
 
-	shm.size = HUGE_PAGE_256M - dsp_shared_size;
+	shm.size = HUGE_PAGE_256M - (dsp_shared_size + IPC_METADATA_AREA_SZ);
 	ret = ioctl(fd, IOCTL_FSL_SHM_INIT, &shm);
 	if (ret == -1)
 		printf("%s: IOCTL_FSL_SHM_INIT failed\n", __func__);
