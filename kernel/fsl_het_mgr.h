@@ -42,5 +42,9 @@
 #define	IOCTL_HW_SEM_SET_VALUE 		_IOW(HET_MGR_MAGIC, 8, hw_sem_t*)
 /* IOCTL to get hardware shemaphore's unique value */
 #define IOCTL_HW_SEM_GET_UVALUE 	_IOR(HET_MGR_MAGIC, 9, hw_sem_info_t*)
+/* IOCTL to get IPC PARAMS  */
+#define IOCTL_HET_MGR_GET_IPC_PARAMS 	_IOR(HET_MGR_MAGIC, 10, uint64_t)
+/* IOCTL to get RAT_MODE  */
+#define IOCTL_HET_MGR_GET_RAT_MODE 	_IOR(HET_MGR_MAGIC, 11, uint64_t)
 
 #endif

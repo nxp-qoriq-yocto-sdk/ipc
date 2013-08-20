@@ -1,7 +1,4 @@
 KERNEL_DIR ?=
-obj-y +=fsl_ipc.o
-obj-m +=ipc.o
-ipc-objs := fsl_ipc.o
 obj-y +=fsl_hetmgr.o
 obj-m +=hetmgr.o
 hetmgr-objs := fsl_hetmgr.o

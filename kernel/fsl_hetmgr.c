@@ -41,7 +41,7 @@
 #include <asm/uaccess.h>
 #include "fsl_heterogeneous.h"
 #include "fsl_ker_compact.h"
-
+#include "fsl_ipc_kmod.h"
 
 static long dsp_shared_size = DSP_SHARED_SZ;
 module_param(dsp_shared_size , long, S_IRUGO);
@@ -53,6 +53,11 @@ static long shared_ctrl_addr = SHARED_CTRL_AREA_START_ADDR;
 module_param(shared_ctrl_addr , long, S_IRUGO);
 static long shared_ctrl_size = SHARED_CTRL_AREA_SZ;
 module_param(shared_ctrl_size , long, S_IRUGO);
+
+static unsigned short max_num_ipc_channels = MAX_IPC_CHANNELS;
+module_param(max_num_ipc_channels, ushort, S_IRUGO);
+static unsigned short max_channel_depth = DEFAULT_CHANNEL_DEPTH;
+module_param(max_channel_depth, ushort, S_IRUGO);
 
 static int 			fslhet_devno;
 static dev_t 			fslhet_dev;
@@ -66,7 +71,6 @@ static void __iomem		*sem;
 static shared_area_t 		shared_area;
 static phys_addr_t 		sh_ctrl_area_mark;
 static os_het_control_t	*ctrl;
-
 
 #ifdef CONFIG_MULTI_RAT
 #define MAX_NUM_IPC_REGIONS 2
@@ -325,6 +329,9 @@ int get_het_sys_map(sys_map_t *sysmap)
 		sysmap->dsp_m3.size = DSP_M3_SZ;
 	}
 
+	pr_info("IPC: max_num_ipc_channels  %d\n", max_num_ipc_channels);
+	pr_info("IPC: max_channel_depth  %d\n", max_channel_depth);
+
 	return 0;
 }
 
@@ -387,6 +394,8 @@ static int het_mgr_ioctl(struct inode *inode, struct file *filp,
 	mem_range_t r;
 	hw_sem_info_t	hinfo;
 	hw_sem_t	hwsem;
+	uint32_t ipc_param_muxed;
+	int num_ipc_regions;
 	switch (cmd) {
 
 	case IOCTL_HET_MGR_GET_SYS_MAP:
@@ -473,6 +482,24 @@ static int het_mgr_ioctl(struct inode *inode, struct file *filp,
 
 		hwsem.value = ioread32be((sem + hwsem.sem_no*0x8));
 		if (copy_to_user((void *)arg, &hwsem, sizeof(hw_sem_t)))
+			ret = -EFAULT;
+		break;
+
+	case IOCTL_HET_MGR_GET_IPC_PARAMS:
+		ipc_param_muxed = (max_channel_depth << 16) |
+			max_num_ipc_channels;
+
+		if (copy_to_user((void *)arg, &ipc_param_muxed,
+				sizeof(ipc_param_muxed)))
+			ret = -EFAULT;
+		break;
+
+	case IOCTL_HET_MGR_GET_RAT_MODE:
+#ifdef CONFIG_MULTI_RAT
+		num_ipc_regions = ctrl->num_ipc_regions;
+#endif
+		if (copy_to_user((void *)arg, &num_ipc_regions,
+				sizeof(int)))
 			ret = -EFAULT;
 		break;
 
