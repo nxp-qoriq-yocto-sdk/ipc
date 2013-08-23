@@ -1011,7 +1011,7 @@ int get_ipc_inst(ipc_userspace_t *ipc_priv, uint32_t inst_id)
 	ENTER();
 
 	os_het_control_t *sh_ctrl =  ipc_priv->sh_ctrl_area.vaddr;
-	os_het_ipc_t *ipc = SH_CTRL_VADDR(sh_ctrl->ipc)
+	os_het_ipc_t *ipc = IPC_CH_VADDR(sh_ctrl->ipc)
 				+ sizeof(os_het_ipc_t)*inst_id;
 	if (!ipc) {
 		ret = -1;
@@ -1237,7 +1237,7 @@ int fsl_B4_ipc_init(void *dsp_bt)
 	debug_print("Enter func %s\n", __func__);
 	uint32_t num_ipc_regions = 0;
 	uint32_t ipc_param_muxed;
-	uint32_t ipc_ch_start_paddr = 0;
+	uint32_t ipc_ch_start_paddr = 0, ipc_het_t_start_paddr = 0;
 	uint16_t max_num_ipc_channels = MAX_IPC_CHANNELS;
 	uint16_t max_channel_depth = DEFAULT_CHANNEL_DEPTH;
 	void *vaddr;
@@ -1245,9 +1245,10 @@ int fsl_B4_ipc_init(void *dsp_bt)
 	int dev_het_mgr = ((dsp_bt_t *)dsp_bt)->het_mgr;
 	mem_strt_addr_t sh_ctrl_area =
 		((dsp_bt_t *)dsp_bt)->het_sys_map.sh_ctrl_area;
-	ipc_ch_start_paddr = shm.paddr + IPC_METADATA_AREA_PADDR_OFFSET;
+	ipc_ch_start_paddr = shm.paddr + IPC_METADATA_AREA_PADDR_OFFSET +
+		IPC_HET_T_SZ_1K;
 	debug_print("ipc_ch_start_paddr = %x\n", ipc_ch_start_paddr);
-
+	ipc_het_t_start_paddr = shm.paddr + IPC_METADATA_AREA_PADDR_OFFSET;
 	/* From module params */
 	uint16_t num_channels, channel_depth;
 
@@ -1277,8 +1278,8 @@ int fsl_B4_ipc_init(void *dsp_bt)
 	}
 	/*os_het_control_t struct*/
 	ctrl = vaddr;
-	/*error prone check again*/
-	ipc = vaddr + ctrl->ipc - sh_ctrl_area.phys_addr;
+	ctrl->ipc = ipc_het_t_start_paddr;
+	ipc = (os_het_ipc_t *)(shm.vaddr + (uint32_t)ctrl->ipc - shm.paddr);
 
 	/* Get RAT MODE */
 	ret = ioctl(dev_het_mgr,
@@ -1354,8 +1355,8 @@ int fsl_B4_ipc_init(void *dsp_bt)
 
 		for (j = 0; j <= rat_inst; j++) {
 
-			ipc = vaddr + ctrl->ipc - sh_ctrl_area.phys_addr +
-				j*sizeof(os_het_ipc_t);
+			ipc = (void *)(shm.vaddr + (uint32_t)ctrl->ipc -
+				shm.paddr + j*sizeof(os_het_ipc_t));
 
 			ipc_ch_start_paddr += j * size;
 			ipc->ipc_channels = ipc_ch_start_paddr;
