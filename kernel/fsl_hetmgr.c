@@ -197,17 +197,10 @@ int init_sh_ctrl_area(void)
 	memset(ctrl, 0, sys_map.sh_ctrl_area.size);
 	pr_debug("sys_map.sh_ctrl_area.size=%x\n", sys_map.sh_ctrl_area.size);
 	ctrl->shared_ctrl_size = 0x4000; /* 16k */
-
 	ctr += sizeof(os_het_control_t);
-	/* set the physical adress for ipc */
-	ctrl->ipc = (sys_map.sh_ctrl_area.phys_addr + ctr);
-	pr_debug("IPC: structure start address = %llx\n",
-			sys_map.sh_ctrl_area.phys_addr + ctr);
-#ifndef CONFIG_MULTI_RAT
-	ctr += sizeof(os_het_ipc_t);
-#else
+
+#ifdef CONFIG_MULTI_RAT
 	ctrl->num_ipc_regions =  MAX_NUM_IPC_REGIONS;
-	ctr += ctrl->num_ipc_regions * sizeof(os_het_ipc_t);
 #endif
 	tmp = sys_map.sh_ctrl_area.phys_addr + ctr;
 
