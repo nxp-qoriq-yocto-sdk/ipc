@@ -47,7 +47,7 @@
 #include "fsl_heterogeneous_mem.h"
 #include "fsl_heterogeneous_debug.h"
 #include "fsl_heterogeneous_debug_print.h"
-
+#include "fsl_heterogeneous_l1_defense.h"
 
 #define OS_HET_IPC_HW_SEMAPHORE_NUM     0
 /* Hardware semaphore to use in case of need for mutual exclusion
@@ -91,6 +91,7 @@ typedef struct {
 #else /* B4860 */
 
 typedef struct {
+    uint32_t		    start_validation_value;
     /* Initialization indication strcuture */
     os_het_init_t           initialized;
     /* SET BY PA: PA shared memory region; */
@@ -100,12 +101,13 @@ typedef struct {
     /* Pointer to array of os_het_ipc_t
      * Pointer IPC heterogeneous structure */
     uint64_t		    ipc;
-    /* Pointer to be used for future purposes */
-    uint64_t		aic;
+    /* Pointer l1_defence pointer */
+    uint64_t		    l1d;
     /* SET BY PA: Pointer to where SmartDSP logs system events
      * PA initializes an array with the number of entries as
-     * there is SC cores*/
-    uint64_t           smartdsp_debug;
+     * there is SC cores
+     * os_het_smartdsp_log_t */
+    uint64_t                smartdsp_debug;
     os_het_debug_print_t    het_debug_print;
     /* SET BY DSP: Size of the shared memory for control information in
      * bytes - Mimumum size is 4 KB set by PA*/
@@ -114,6 +116,7 @@ typedef struct {
     /* Number of IPC regions - only for multimode usages */
     uint32_t                num_ipc_regions;
 #endif
+    uint32_t		    end_validation_value;
 } os_het_control_t;
 
 #endif

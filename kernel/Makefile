@@ -5,6 +5,9 @@ hetmgr-objs := fsl_hetmgr.o
 obj-y +=fsl_shm.o
 obj-m +=shm.o
 shm-objs := fsl_shm.o
+obj-y +=fsl_L1_defense.o
+obj-m +=l1d.o
+l1d-objs := fsl_L1_defense.o
 
 ifeq ($(KERNEL_DIR),)
     $(error ERROR: KERNEL_DIR is not defined...!)

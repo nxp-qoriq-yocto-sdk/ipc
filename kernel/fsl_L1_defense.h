@@ -1,5 +1,7 @@
 /*
- * Copyright (c) 2013 Freescale Semiconductor Inc.
+ *  @ fsl_L1_defense.h
+ *
+ * Copyright (c) 2013, Freescale Semiconductor Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,48 +27,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
+ *      Author: Ashish Kumar <Ashish.Kumar@freescale.com>
+ *
  */
+#ifndef _FSL_L1_DEFENSE_H
+#define _FSL_L1_DEFENSE_H
 
+#include <linux/ioctl.h>
+#define FSL_MPIC_WATCHDOG_IRQ 17
 
-/******************************************************************************
+#define FSL_L1D_MAGIC	'W'
+/* IOCTL to get ipc_wdt_wsrsr_bitmask */
+#define IOCTL_FSL_L1D_GET_WSRSR_BITMASK	_IOWR(FSL_L1D_MAGIC, 1, uint64_t)
 
- @File          fsl_heterogeneous_debug.h
-
- @Description   Debug shared header file between SC and PA cores.
-
-*//***************************************************************************/
-
-#ifndef __FSL_HETEROGENEOUS_DEBUG_H
-#define __FSL_HETEROGENEOUS_DEBUG_H
-
-
-#include "fsl_heterogeneous_common.h"
-
-/**************************************************************************/
-/*@Description   SmartDSP Event log*/
-
-/***************************************************************************/
-#ifdef B913x
-typedef struct {
-    /* Pointer to the core's event log(physical address) */
-    uintptr_t   base_address;
-    /* Size of the event log (in bytes) */
-    uint32_t    size;
-    /* Pointer to the last error in SmartDSP. A value of 1 (OS_SUCCESS)
-	* means no error */
-    uint32_t	*last_error;
-} os_het_smartdsp_log_t;
-#else /* B4860 */
-typedef struct {
-    uint32_t    start_validation_value;
-    /* Pointer to the core's event log(physical address) */
-    uint64_t   base_address;
-    /* Size of the event log (in bytes) */
-    uint32_t    size;
-    /* Pointer to the last error in SmartDSP. A value of 1 (OS_SUCCESS)
-	* means no error */
-    uint64_t	last_error;
-    uint32_t    end_validation_value;
-} os_het_smartdsp_log_t;
 #endif
-#endif /*__FSL_HETEROGENEOUS_DEBUG_H*/

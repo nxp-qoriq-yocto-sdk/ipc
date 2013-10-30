@@ -141,6 +141,9 @@ typedef enum {
 
 *//***************************************************************************/
 typedef struct {
+#ifdef B4860
+    uint32_t		    start_validation_value;
+#endif
     /* Indicates whether the mailbox is initialized by the producer;
 	This field is written by the producer */
     uint32_t                producer_initialized;
@@ -191,6 +194,7 @@ typedef struct {
     void		    *semaphore_pointer;
 #else
     uint64_t 		     semaphore_pointer;
+    uint32_t		     end_validation_value;
 #endif
 } os_het_ipc_channel_t;
 
@@ -200,6 +204,9 @@ typedef struct {
 
 *//***************************************************************************/
 typedef struct {
+#ifdef B4860
+    uint32_t 		    start_validation_value;
+#endif
     /* Number of channels in the ipc_channels array;
 	this is a bootarg to Linux and will be set by Linux accordingly */
     uint32_t                num_ipc_channels;
@@ -212,7 +219,8 @@ typedef struct {
 #ifdef B913x
     os_het_ipc_channel_t    (*ipc_channels)[];
 #else
-    uint64_t    ipc_channels;
+    uint64_t    	    ipc_channels;
+    uint32_t		    end_validation_value;
 #endif
 } os_het_ipc_t;
 

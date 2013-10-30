@@ -46,5 +46,7 @@
 #define IOCTL_HET_MGR_GET_IPC_PARAMS 	_IOR(HET_MGR_MAGIC, 10, uint64_t)
 /* IOCTL to get RAT_MODE  */
 #define IOCTL_HET_MGR_GET_RAT_MODE 	_IOR(HET_MGR_MAGIC, 11, uint64_t)
+/* IOCTL to reset het structure */
+#define IOCTL_HET_MGR_RESET_STRUCTURES	_IOW(HET_MGR_MAGIC, 12, uint32_t)
 
 #endif

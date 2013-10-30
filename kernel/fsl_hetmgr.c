@@ -42,6 +42,7 @@
 #include "fsl_heterogeneous.h"
 #include "fsl_ker_compact.h"
 #include "fsl_ipc_kmod.h"
+#include "fsl_heterogeneous_l1_defense.h"
 
 static long dsp_shared_size = DSP_SHARED_SZ;
 module_param(dsp_shared_size , long, S_IRUGO);
@@ -177,8 +178,10 @@ int init_sh_ctrl_area(void)
 #else /* B4860 */
 int init_sh_ctrl_area(void)
 {
-	int ctr = 0;
+	int ctr = 0, i = 0;
 	uint64_t tmp;
+	os_het_l1d_t *l1_defense;
+	os_het_smartdsp_log_t *smartdsp_debug;
 
 	pr_debug("Initializing Shared control area\n");
 	pr_debug("Shared Control area start address = %llx\n",
@@ -197,6 +200,8 @@ int init_sh_ctrl_area(void)
 	memset(ctrl, 0, sys_map.sh_ctrl_area.size);
 	pr_debug("sys_map.sh_ctrl_area.size=%x\n", sys_map.sh_ctrl_area.size);
 	ctrl->shared_ctrl_size = 0x4000; /* 16k */
+	ctrl->start_validation_value = HET_START_VALID_VALUE;
+	ctrl->end_validation_value = HET_END_VALID_VALUE;
 	ctr += sizeof(os_het_control_t);
 
 #ifdef CONFIG_MULTI_RAT
@@ -207,8 +212,46 @@ int init_sh_ctrl_area(void)
 	ctrl->smartdsp_debug = tmp;
 	pr_debug("IPC: Smart DSP Debug start address = %llx\n", tmp);
 
+	smartdsp_debug = ioremap(
+		ctrl->smartdsp_debug, sizeof(os_het_smartdsp_log_t));
+	if (!smartdsp_debug) {
+		pr_err("ioremap failed with addr=%llx val=%lx in l1_defense\n",
+		ctrl->smartdsp_debug, sizeof(os_het_smartdsp_log_t));
+		return -1;
+	}
 
-	ctr += sizeof(os_het_smartdsp_log_t) * 2;
+	for (i = 0 ; i < NR_DSP_CORE; i++) {
+		memset(&smartdsp_debug[i], 0, sizeof(os_het_smartdsp_log_t));
+		smartdsp_debug[i].start_validation_value =
+						HET_START_VALID_VALUE;
+		smartdsp_debug[i].end_validation_value =
+						HET_END_VALID_VALUE;
+
+	}
+
+	/* Earlier there was allocation for only 2 os_het_smartdsp_t
+	 *  now changed to 6 while implemneting l1_defense
+	 *  so ctr += sizeof(os_het_smartdsp_log_t) *6;
+	 */
+	ctr += sizeof(os_het_smartdsp_log_t) * NR_DSP_CORE;
+	/*get physical address for l1_defense */
+	tmp = sys_map.sh_ctrl_area.phys_addr + ctr;
+	ctrl->l1d = tmp;
+
+	l1_defense = ioremap(
+		ctrl->l1d, sizeof(os_het_l1d_t));
+	if (!l1_defense) {
+		pr_err("ioremap failed with addr=%llx val=%lx in l1_defense\n",
+		ctrl->l1d, sizeof(os_het_l1d_t));
+		return -1;
+	}
+
+	/* zeroize the structure os_het_l1d_t */
+	memset(l1_defense, 0, sizeof(os_het_l1d_t));
+	l1_defense->start_validation_value = HET_START_VALID_VALUE;
+	l1_defense->end_validation_value = HET_END_VALID_VALUE;
+
+	ctr += sizeof(os_het_l1d_t);
 	sh_ctrl_area_mark = sys_map.sh_ctrl_area.phys_addr + ctr;
 	pr_debug("IPC: Free Area starts from %llx\n",
 		(unsigned long long)sh_ctrl_area_mark);
@@ -216,6 +259,28 @@ int init_sh_ctrl_area(void)
 	return 0;
 }
 #endif
+
+static int fsl_reinit_sh_ctrl_area(void)
+{
+	os_het_mem_t pa_shared_mem;
+	os_het_mem_t sc_shared_mem;
+	int ret = 0;
+
+	memcpy((void *)&pa_shared_mem, (void *)&ctrl->pa_shared_mem,
+			sizeof(os_het_mem_t));
+	memcpy((void *)&sc_shared_mem, (void *)&ctrl->sc_shared_mem,
+			sizeof(os_het_mem_t));
+
+	/* this cause ioremap twice for ctrl*/
+	ret = init_sh_ctrl_area();
+
+	/* copy it back now*/
+	memcpy((void *)&ctrl->pa_shared_mem, (void *)&pa_shared_mem,
+			sizeof(os_het_mem_t));
+	memcpy((void *)&ctrl->sc_shared_mem, (void *)&sc_shared_mem,
+			sizeof(os_het_mem_t));
+	return ret;
+}
 
 int init_hw_sem(void)
 {
@@ -494,6 +559,10 @@ static int het_mgr_ioctl(struct inode *inode, struct file *filp,
 		if (copy_to_user((void *)arg, &num_ipc_regions,
 				sizeof(int)))
 			ret = -EFAULT;
+		break;
+
+	case IOCTL_HET_MGR_RESET_STRUCTURES:
+		ret = fsl_reinit_sh_ctrl_area();
 		break;
 
 	default:

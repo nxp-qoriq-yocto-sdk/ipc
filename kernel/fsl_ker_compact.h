@@ -37,6 +37,7 @@
 #define DSP_M3          0xc40000000
 #define DSP_M3_SZ       (64*512)
 #define HW_SEM_OFFSET   0x8F2108
+#define NR_DSP_CORE	6
 
 #define SHARED_CTRL_AREA_START_ADDR     0xFFF00000
 /* only 1 mb for shared ctrl area for B4 */

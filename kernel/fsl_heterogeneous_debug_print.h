@@ -102,7 +102,7 @@ typedef struct {
 
 typedef struct {
 
-	/* Pointer to the base address of the SC VTB */
+    /* Pointer to the base address of the SC VTB */
     uint64_t                buffer_location;
     /* Size of each segment in VTB */
     uint32_t                 segment_size;
