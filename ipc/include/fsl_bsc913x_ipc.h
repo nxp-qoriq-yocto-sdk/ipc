@@ -19,6 +19,7 @@ O	- Optional
 ****************/
 
 #include "fsl_ipc_types.h"
+#include "dsp_boot.h"
 
 /* Defines */
 /*****************************************************************************/
@@ -453,4 +454,29 @@ int fsl_send_vnmi(void);
  * * DSP/L1 image upon receiving `DSP Ready. indication from DSP.
  * ************************************************************************/
 int fsl_restart_L1(fsl_ipc_t ipc, char *fname);
+
+/**************************************************************************
+ * * Function pointer returning void
+ * * core_mask[in] core mask returned by IOCTL thread
+ * *
+ * * typedef void (*fsl_defense_cb)(uint32_t core_mask)
+ * * cb: pointer to function of type .fsl_defence_cb.
+ * *
+ * ***********************************************************************/
+typedef void (*fsl_defense_cb)(uint32_t core_mask);
+
+/**************************************************************************
+ * * @fsl_L1_defense_register_cb
+ * * typedef void (*fsl_defense_cb)(uint32_t core_mask)
+ * * cbi[in]: pointer to function of type fsl_defence_cb.
+ * *
+ * * Return: void
+ * *
+ * * Description
+ * * Create a thread for IOCTL of WSRSR bitmask
+ * * If bitmask is non zero calls recovery function
+ * * else IOCTL sleeps on waitqueqe
+ * **********************************************************************/
+void fsl_L1_defense_register_cb(fsl_defense_cb cb);
+
 #endif /* FSL_913x_IPC_H_ */

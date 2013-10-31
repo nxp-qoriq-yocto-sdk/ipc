@@ -25,6 +25,8 @@
 #include "fsl_ipc_shm.h"
 #include "dsp_boot.h"
 #include "dsp_compact.h"
+#include "fsl_heterogeneous_l1_defense.h"
+#include "fsl_heterogeneous.h"
 
 /* defines */
 #define MAX_ENTRIES	10
@@ -35,8 +37,16 @@
 
 /* DSP CCSR */
 #define DSP_GCR	0x18000
-#define GIC_VIGR 0x17000
-#define GIC_VIGR_VALUE 0x107
+#ifdef B4860
+static int DCFG_BRR_mask;
+static int GIC_VIGR_VALUE;
+static int GIC_VIGR_VALUE_ARR[6] = {0x000, 0x001, 0x002, 0x003, 0x004, 0x005};
+#define SH_CTRL_VADDR_DSPBT(A, B) \
+		(void *)((unsigned long)(A) \
+		- ((dsp_bt_t *)(B))->sh_ctrl_area.phys_addr \
+		+ ((dsp_bt_t *)(B))->sh_ctrl_area.vaddr)
+
+#endif
 #define PASTATE	0x104
 #define DSPSTATE 0x100
 #define BOOT_JMP_ADDR	0x108
@@ -540,7 +550,7 @@ static int reset_ppc_ready(void *dsp_bt)
 
 int send_vnmi_func(void *dsp_bt)
 {
-	reload_print("Entering func %s\n", __func__);
+	l1d_printf("Entering func %s\n", __func__);
 	sys_map_t *het_sys_map = &((dsp_bt_t *)dsp_bt)->het_sys_map;
 	int dev_mem = ((dsp_bt_t *)dsp_bt)->dev_mem;
 	volatile void *vaddr;
@@ -856,7 +866,6 @@ end_fsl_restart_L1:
 #ifdef B4860
 static int release_starcore_B4(void *dsp_bt)
 {
-	int core_id = ((dsp_bt_t *)dsp_bt)->core_id;
 	uint32_t intvec_addr = ((dsp_bt_t *)dsp_bt)->intvec_addr;
 	sys_map_t *het_sys_map = &((dsp_bt_t *)dsp_bt)->het_sys_map;
 
@@ -866,8 +875,6 @@ static int release_starcore_B4(void *dsp_bt)
 
 	/*map to this value phys_addr = 0xffe000000*/
 	uint64_t phys_addr = het_sys_map->pa_ccsrbar.phys_addr;
-
-	core_id += 4;
 
 	vaddr = map_area64(phys_addr, &size, dsp_bt);
 	if (!vaddr) {
@@ -894,7 +901,7 @@ static int release_starcore_B4(void *dsp_bt)
 	asm("lwsync");
 	*(vaddr + GCR_CHMER0) =  0x00003f00;
 	asm("lwsync");
-	*(vaddr + DCFG_BRR) |=  1 << core_id;
+	*(vaddr + DCFG_BRR) |=  DCFG_BRR_mask;
 	asm("lwsync");
 
 	printf(" After StarCore release ========\n");
@@ -950,8 +957,255 @@ int check_dsp_boot_B4(void *dsp_bt)
 		}
 	}
 
+	unmap_area((void *)vaddr, size);
 	return 0;
 }
+
+int check_vnmi_ack_B4(void *dsp_bt)
+{
+
+	l1d_printf("enter func %s\n", __func__);
+	int core_id = ((dsp_bt_t *)dsp_bt)->core_id;
+	os_het_control_t *ctrl = ((dsp_bt_t *)dsp_bt)->sh_ctrl_area.vaddr;
+	os_het_l1d_t *l1_defense = SH_CTRL_VADDR_DSPBT(ctrl->l1d, dsp_bt);
+
+	/*sleep 100ms for dsp to set ack */
+	usleep(10000);
+
+	if (l1_defense->reset_status[core_id] !=
+	    OS_HET_INFO_L1D_READY_FOR_RESET) {
+		return -1;
+	} else
+		return 0;
+}
+
+static int set_PH15_on_dspcore_B4(dsp_core_info *DspCoreInfo, void *dsp_bt)
+{
+	l1d_printf("enter func %s\n", __func__);
+	uint32_t PH15_mask = 0, i = 0;
+
+	sys_map_t *het_sys_map = &((dsp_bt_t *)dsp_bt)->het_sys_map;
+	uint64_t size = het_sys_map->pa_ccsrbar.size;
+	volatile uint32_t *vaddr = NULL;
+
+	/*map to this value phys_addr = 0xffe000000*/
+	uint64_t phys_addr = het_sys_map->pa_ccsrbar.phys_addr;
+
+	vaddr = map_area64(phys_addr, &size, dsp_bt);
+	if (!vaddr) {
+		printf("\nError in mapping physical address %llx to virtual"
+		       "address from func %s\n",
+		       (long long unsigned int)phys_addr, __func__);
+		return -1;
+	}
+
+	while (i < NR_DSP_CORE) {
+		PH15_mask |=
+		 ((DspCoreInfo->reDspCoreInfo[i].reset_core_flag) << (i + 4));
+		i++;
+	}
+
+	l1d_printf("PH15_mask = %#x in func %s\n", PH15_mask, __func__);
+
+	*(vaddr + PCPH15SETR) |= PH15_mask;
+	asm("lwsync");
+	sleep(2);
+	puts("Set PH15");
+	l1d_printf("%s: PCPH15SR=0x%x\n", __func__, *(vaddr + PCPH15SR));
+	l1d_printf("%s: PCPH15CLRR=0x%x\n", __func__, *(vaddr + PCPH15CLRR));
+	unmap_area((void *)vaddr, size);
+	return 0;
+}
+
+static int set_PIR_on_dspcore_B4(dsp_core_info *DspCoreInfo, void *dsp_bt)
+{
+	uint32_t i = 0;
+	uint32_t PIR_mask = 0;
+
+	sys_map_t *het_sys_map = &((dsp_bt_t *)dsp_bt)->het_sys_map;
+	uint64_t size = het_sys_map->pa_ccsrbar.size;
+	volatile uint32_t *vaddr = NULL;
+
+	/*map to this value phys_addr = 0xffe000000*/
+	uint64_t phys_addr = het_sys_map->pa_ccsrbar.phys_addr;
+
+	vaddr = map_area64(phys_addr, &size, dsp_bt);
+	if (!vaddr) {
+		printf("\nError in mapping physical address %llx to virtual"
+		       "address from func %s\n",
+		       (long long unsigned int)phys_addr, __func__);
+		return -1;
+	}
+
+	while (i < NR_DSP_CORE) {
+		PIR_mask |=
+		 (DspCoreInfo->reDspCoreInfo[i].reset_core_flag) << (i + 8);
+		i++;
+	}
+
+	l1d_printf("PIR_mask = %#x in func %s\n", PIR_mask, __func__);
+
+
+	*(vaddr + PIR) |= PIR_mask;
+	asm("lwsync");
+	sleep(1);
+	puts("Set PIR");
+	printf("PIR=0x%x\n", *(vaddr + PIR));
+	l1d_printf("PCPH15PSR=0x%x\n", *(vaddr + PCPH15PSR));
+
+	l1d_printf("PCPH15CLRR=0x%x\n", *(vaddr + PCPH15CLRR));
+	l1d_printf("PCPH15SR=0x%x\n", *(vaddr + PCPH15SR));
+	l1d_printf("PCPH15PSR=0x%x\n", *(vaddr + PCPH15PSR));
+
+	unmap_area((void *)vaddr, size);
+	return 0;
+}
+
+static int Reset_PIR_PH15_on_dspcore_B4(dsp_core_info *DspCoreInfo,
+		void *dsp_bt)
+{
+	uint32_t i = 0;
+	uint32_t PH15CLRR_mask = 0;
+
+	sys_map_t *het_sys_map = &((dsp_bt_t *)dsp_bt)->het_sys_map;
+	uint64_t size = het_sys_map->pa_ccsrbar.size;
+	volatile uint32_t *vaddr = NULL;
+
+	/*map to this value phys_addr = 0xffe000000*/
+	uint64_t phys_addr = het_sys_map->pa_ccsrbar.phys_addr;
+
+	l1d_printf("Enter func %s \n", __func__);
+	vaddr = map_area64(phys_addr, &size, dsp_bt);
+	if (!vaddr) {
+		printf("\nError in mapping physical address %llx to virtual"
+		       "address from func %s\n",
+		       (long long unsigned int)phys_addr, __func__);
+		return -1;
+	}
+
+	while (i < NR_DSP_CORE) {
+		PH15CLRR_mask |=
+		 ((DspCoreInfo->reDspCoreInfo[i].reset_core_flag) << (i + 4));
+		i++;
+	}
+
+	l1d_printf("PH15CLRR_mask = %#x in func %s\n", PH15CLRR_mask, __func__);
+
+
+	l1d_printf("%s: PIR=0x%x\n", __func__, *(vaddr + PIR));
+	l1d_printf("PCPH15PSR=0x%x\n", *(vaddr + PCPH15PSR));
+
+	puts("clear PIR");
+	*(vaddr + PIR) = 0 ;
+	asm("lwsync");
+	l1d_printf("%s: PIR=0x%x\n", __func__, *(vaddr + PIR));
+
+	sleep(1);
+	puts("clear PH15");
+	*(vaddr + PCPH15CLRR) = PH15CLRR_mask;
+	asm("lwsync");
+	l1d_printf("PCPH15CLRR=0x%x\n", *(vaddr + PCPH15CLRR));
+	l1d_printf("PCPH15SR=0x%x\n", *(vaddr + PCPH15SR));
+	printf("PCPH15PSR=0x%x\n", *(vaddr + PCPH15PSR));
+
+	unmap_area((void *)vaddr, size);
+	return 0;
+}
+
+static int check_dsp_ready_CRSTSR_B4(dsp_core_info *DspCoreInfo, void *dsp_bt)
+{
+	l1d_printf("enter func %s\n", __func__);
+	uint32_t i = 0, j  = 0;
+
+	sys_map_t *het_sys_map = &((dsp_bt_t *)dsp_bt)->het_sys_map;
+	uint64_t size = het_sys_map->pa_ccsrbar.size;
+	volatile uint32_t *vaddr = NULL;
+
+	/*map to this value phys_addr = 0xffe000000*/
+	uint64_t phys_addr = het_sys_map->pa_ccsrbar.phys_addr;
+
+	vaddr = map_area64(phys_addr, &size, dsp_bt);
+	if (!vaddr) {
+		printf("\nError in mapping physical address %llx to virtual"
+		       "address from func %s\n",
+		       (long long unsigned int)phys_addr, __func__);
+		return -1;
+	}
+	sleep(3);
+	while (i < NR_DSP_CORE) {
+		if (DspCoreInfo->reDspCoreInfo[i].reset_core_flag) {
+			l1d_printf("%s: ready=%#x\n", __func__,
+				   (*(vaddr + DCFG_CRSTSR + i)));
+
+			while (j++ < 5) {
+				if (0x4 & (*(vaddr + DCFG_CRSTSR + i))) {
+					printf("Core_id = %#x is ready now\n",
+						(i + 4));
+					j = 0;
+					break;
+				} else {
+					puts("sleep 1 sec");
+					sleep(1);
+				}
+			}
+
+			if ((0x4 & (*(vaddr + DCFG_CRSTSR + i))) != 0x4)
+				return -1;
+
+		}
+
+		i++;
+	}
+
+	unmap_area((void *)vaddr, size);
+	return 0;
+}
+
+static void set_reset_modes_B4(dsp_core_info *DspCoreInfo, void *dsp_bt)
+{
+	l1d_printf("enter func %s\n", __func__);
+	os_het_control_t *ctrl = ((dsp_bt_t *)dsp_bt)->sh_ctrl_area.vaddr;
+	os_het_l1d_t *l1_defense =
+		SH_CTRL_VADDR_DSPBT(ctrl->l1d, dsp_bt);
+
+	l1_defense->warm_reset_mode = DspCoreInfo->reset_mode;
+	l1_defense->reset_maple = DspCoreInfo->maple_reset_mode;
+	return;
+}
+
+static int reset_het_structures_B4(void *dsp_bt)
+{
+	l1d_printf("enter func %s\n", __func__);
+	int dev_het_mgr = ((dsp_bt_t *)dsp_bt)->het_mgr;
+	return ioctl(dev_het_mgr, IOCTL_HET_MGR_RESET_STRUCTURES, 0);
+}
+
+void flush_cnpc()
+{
+	l1d_printf("Enter func %s\n", __func__);
+	volatile uint32_t *cnpc_dcsr = NULL;
+	int	mem_fd;
+	mem_fd = open("/dev/mem", O_RDWR);
+	if (mem_fd == -1) {
+		fprintf(stderr, "dsp: Error: Cannot open /dev/mem\n");
+		return;
+	}
+
+	/* mmap64 used in original code */
+	cnpc_dcsr = (uint32_t *) mmap(NULL, NPC_REGS_SIZE,
+		(PROT_READ | PROT_WRITE),
+		MAP_SHARED, mem_fd, CNPC_PHYSICAL_ADDR);
+
+	if (cnpc_dcsr == MAP_FAILED) {
+		printf("error in mmap (dcsr) frm %s\n", __func__);
+		return;
+	}
+
+	/* flush Central Nexus Port Controller by setting C-OQCR[AFA]*/
+	cnpc_dcsr[DCSR_CNPC_OQCR_OFFSET] |= DCSR_CNPC_OQCR_AFA_MASK;
+	return;
+}
+
 
 int pre_load_B4(int count, ...)
 {
@@ -1001,9 +1255,128 @@ int pre_load_B4(int count, ...)
 	return 0;
 }
 
+int pre_Reload_B4(int count, ...)
+{
+	int ret = 0, j = 0;
+	va_list arg_b;
+	va_start(arg_b, count);
+	void *dsp_bt = va_arg(arg_b, void*);
+	void *ipc = va_arg(arg_b, void*);
+	dsp_core_info *DspCoreInfo = (dsp_core_info *)va_arg(arg_b, void*);
+	sys_map_t *het_sys_map = NULL;
+	uint64_t size = 0;
+	/*map to this value phys_addr = 0xfff00000*/
+	uint64_t phys_addr = 0;
+	uint32_t *ctrl = NULL;
+
+
+	((dsp_bt_t *)dsp_bt)->het_mgr = init_hetmgr();
+	if (((dsp_bt_t *)dsp_bt)->het_mgr == -1) {
+		printf("error in het_mgr frm %s\n", __func__);
+		return -1;
+	}
+
+	((dsp_bt_t *)dsp_bt)->dev_mem = init_devmem();
+	if (((dsp_bt_t *)dsp_bt)->dev_mem == -1) {
+		printf("error in dev_mem frm %s\n", __func__);
+		return -1;
+	}
+
+	ret = ioctl(((dsp_bt_t *)dsp_bt)->het_mgr,
+		    IOCTL_HET_MGR_GET_SYS_MAP,
+		    &((dsp_bt_t *)dsp_bt)->het_sys_map);
+	if (ret) {
+		perror("IOCTL_HET_MGR_GET_SYS_MAP:");
+		printf("frm %s\n", __func__);
+		return -1;
+	}
+
+	if (assign_memory_areas(dsp_bt)) {
+		printf("error in assign_memory_areas frm %s\n", __func__);
+		return -1;
+	}
+
+	het_sys_map = &((dsp_bt_t *)dsp_bt)->het_sys_map;
+	size = het_sys_map->sh_ctrl_area.size;
+	/*map to this value phys_addr = 0xfff00000*/
+	phys_addr = het_sys_map->sh_ctrl_area.phys_addr;
+	/* get os_het_control_t */
+	ctrl = mmap(0, size, (PROT_READ | PROT_WRITE),
+			MAP_SHARED, ((dsp_bt_t *)dsp_bt)->dev_mem, phys_addr);
+
+	if (!ctrl) {
+		printf("\nError in physical address %llx to virtual"
+		       "address\n", phys_addr);
+		return -1;
+	}
+
+	/*fill dsp_bt with sh_ctrl_area values*/
+	((dsp_bt_t *)dsp_bt)->sh_ctrl_area.vaddr = (void *)ctrl;
+	((dsp_bt_t *)dsp_bt)->sh_ctrl_area.phys_addr = phys_addr;
+	((dsp_bt_t *)dsp_bt)->sh_ctrl_area.size = size;
+	l1d_printf("%s: vadr=%p ph=%llx sz=%llx\n",
+		   __func__, ctrl, phys_addr, size);
+
+	l1d_printf("DspCoreInfo->reDspCoreInfo[j].reset_core_flag = %x\n",
+			DspCoreInfo->reDspCoreInfo[j].reset_core_flag);
+	for (j = 0; j < NR_DSP_CORE; j++) {
+		((dsp_bt_t *)dsp_bt)->core_id = j;
+		if (DspCoreInfo->reDspCoreInfo[j].reset_core_flag) {
+			GIC_VIGR_VALUE = GIC_VIGR_VALUE_ARR[j];
+			if (send_vnmi_func(dsp_bt)) {
+				printf("Error in send_vnmi_func frm %s\n",
+					__func__);
+				return -1;
+			}
+			if (check_vnmi_ack_B4(dsp_bt)) {
+				printf("Error in check_vnmi_ack frm %s\n",
+					__func__);
+				return -1;
+
+			}
+		}
+	}
+
+	set_PH15_on_dspcore_B4(DspCoreInfo, dsp_bt);
+
+	if (DspCoreInfo->reset_mode == MODE_3_ACTIVE) {
+		if (reset_het_structures_B4(dsp_bt) < 0) {
+			printf("Error in reset_het_structures frm %s\n",
+				__func__);
+			return -1;
+		} else if (fsl_B4_ipc_reinit(ipc, dsp_bt) < 0) {
+			printf("Error in fsl_ipc_reinit frm %s\n", __func__);
+			return -1;
+		}
+	} else {
+		ret = check_validation_fields(ctrl, dsp_bt);
+		if (ret != 0)
+			return ret;
+
+	}
+
+	set_reset_modes_B4(DspCoreInfo, dsp_bt);
+
+	/* flush VTB
+	 * Check for which mode this flush is needed
+	 */
+	if (DspCoreInfo->debug_print != 0)
+		flush_cnpc();
+
+	if (set_PIR_on_dspcore_B4(DspCoreInfo, dsp_bt) < 0) {
+		printf("Error in set_PIR_on_dspcore_B4 frm %s\n", __func__);
+		return -1;
+	}
+
+	va_end(arg_b);
+	return 0;
+}
+
 int load_B4(char *fname, void *dsp_bt)
 {
 	static int j;
+	printf("Loading Dsp image %s\n", fname);
+	int core_id = ((dsp_bt_t *)dsp_bt)->core_id;
 	if (load_dsp_image(fname, dsp_bt)) {
 		printf("Error in loading Dsp image StarCore\n");
 		return -1;
@@ -1018,9 +1391,28 @@ int load_B4(char *fname, void *dsp_bt)
 			j++;
 	}
 
-	if (release_starcore_B4(dsp_bt)) {
-		printf("Error in releasing StarCore\n");
+	core_id += 4;
+	DCFG_BRR_mask |=  1 << core_id;
+	return 0;
+}
+
+int Reload_B4(char *fname, void *dsp_bt)
+{
+	static int j;
+	printf("Reloading image %s\n", fname);
+	if (load_dsp_image(fname, dsp_bt)) {
+		printf("Error in loading Dsp image StarCore\n");
 		return -1;
+	}
+
+	sleep(2);
+	if (((dsp_bt_t *)dsp_bt)->core_id == 0) {
+		if (set_sh_ctrl_pa_init(((dsp_bt_t *)dsp_bt)->het_mgr)) {
+			printf("Error initialising PA Share"
+				" CTRL StarCore\n");
+			return -1;
+		} else
+			j++;
 	}
 
 	return 0;
@@ -1031,7 +1423,7 @@ int post_load_B4(void *dsp_bt)
 	return check_dsp_boot_B4(dsp_bt);
 }
 
-int b4860_load_dsp_image(int argc, char *argv[])
+int b4860_load_dsp_image(int argc, dspbt_core_info CoreInfo[])
 {
 
 	int i = 0;
@@ -1051,22 +1443,30 @@ int b4860_load_dsp_image(int argc, char *argv[])
 	if (((dsp_bt_t *)dsp_bt)->pre_load(1, dsp_bt) < 0)
 		goto end_b4860_load_dsp_image;
 
-	/* Load image and release StarCore */
+	/* Load image StarCore */
 	argc -= 1 ;
 	i += 1;
 
-	while (argc > 1) {
-		((dsp_bt_t *)dsp_bt)->core_id = atoi(argv[i + 1]);
+	while (argc > 0) {
+		((dsp_bt_t *)dsp_bt)->core_id = CoreInfo[i].core_id;
 
-		if (((dsp_bt_t *)dsp_bt)->load_image(argv[i + 2], dsp_bt) < 0)
+		if (((dsp_bt_t *)dsp_bt)->load_image(CoreInfo[i].image_name,
+		dsp_bt) < 0)
 			goto end_b4860_load_dsp_image;
 
-		argc -= 2;
-		i += 2;
+		argc -= 1;
+		i += 1;
 	}
 
+	/* release StarCore */
+	if (release_starcore_B4(dsp_bt)) {
+		printf("Error in releasing StarCore\n");
+		goto end_b4860_load_dsp_image;
+	} else
+		DCFG_BRR_mask = 0;
+
 	/* copy semaphore number*/
-	((dsp_bt_t *)dsp_bt)->semaphore_num = atoi(argv[1]);
+	((dsp_bt_t *)dsp_bt)->semaphore_num = CoreInfo[0].core_id;
 	if (((dsp_bt_t *)dsp_bt)->post_load(dsp_bt) < 0)
 		goto end_b4860_load_dsp_image;
 	else {
@@ -1080,5 +1480,133 @@ end_b4860_load_dsp_image:
 	cleanup(((dsp_bt_t *)dsp_bt)->dev_mem,
 		((dsp_bt_t *)dsp_bt)->het_mgr);
 	return -1;
+}
+
+int fsl_start_L1_defense(fsl_ipc_t ipc, dsp_core_info *DspCoreInfo)
+{
+	int i = 0, ret = 0;
+	void *dsp_bt;
+	os_het_control_t *ctrl = NULL;
+	os_het_l1d_t *l1_d = NULL;
+	dsp_bt = (void *)malloc(sizeof(dsp_bt_t));
+
+	((dsp_bt_t *)dsp_bt)->het_mgr = -1;
+	((dsp_bt_t *)dsp_bt)->dev_mem = -1;
+
+	/* Assign func Pointers*/
+	((dsp_bt_t *)dsp_bt)->pre_load = &pre_Reload_B4;
+	((dsp_bt_t *)dsp_bt)->load_image = &Reload_B4;
+	((dsp_bt_t *)dsp_bt)->post_load = &post_load_B4;
+
+
+	/* Call func Pointers*/
+
+	if (!ipc) {
+		ret = (((dsp_bt_t *)dsp_bt)->pre_load(3, dsp_bt,
+			NULL, (void *)DspCoreInfo) < 0);
+		if (ret != 0)
+			goto end_L1_defense;
+	} else {
+		ret = (((dsp_bt_t *)dsp_bt)->pre_load(3, dsp_bt, ipc,
+				(void *)DspCoreInfo) < 0);
+		if (ret != 0)
+			goto end_L1_defense;
+
+	}
+
+
+	/*shared images loading only for mode 3*/
+	while (i < NR_DSP_CORE) {
+			if ((DspCoreInfo->reset_mode == MODE_3_ACTIVE) &&
+			    DspCoreInfo->shDspCoreInfo[i].reset_core_flag) {
+				((dsp_bt_t *)dsp_bt)->core_id = -1;
+				if (((dsp_bt_t *)dsp_bt)->load_image(\
+				   DspCoreInfo->shDspCoreInfo[i].dsp_filename,\
+				   dsp_bt) < 0)
+					goto end_L1_defense;
+				else
+					ret = 0;
+				}
+
+			i++;
+		}
+
+	/* Load image on StarCore */
+	i = 0;
+	while (i < NR_DSP_CORE) {
+			if (DspCoreInfo->reDspCoreInfo[i].reset_core_flag) {
+				((dsp_bt_t *)dsp_bt)->core_id = i;
+				if (((dsp_bt_t *)dsp_bt)->load_image(\
+				 DspCoreInfo->reDspCoreInfo[i].dsp_filename,\
+				 dsp_bt) < 0)
+					goto end_L1_defense;
+				else
+					ret = 0;
+			}
+
+			i++;
+		}
+
+	/* should have been in post load but post load needs
+	 * variable argumrnt now */
+
+	if (Reset_PIR_PH15_on_dspcore_B4(DspCoreInfo, dsp_bt) < 0) {
+		printf("Error in Reset_PIR_PH15_on_dspcore_B4 frm %s\n",
+				__func__);
+		goto end_L1_defense;
+	}
+
+	if (check_dsp_ready_CRSTSR_B4(DspCoreInfo, dsp_bt) < 0) {
+		printf("Error in check_dsp_ready_CRSTSR_B4 frm %s\n", __func__);
+		goto end_L1_defense;
+	}
+
+	/* copy semaphore number*/
+	((dsp_bt_t *)dsp_bt)->semaphore_num = DspCoreInfo->hw_sem_num;
+	if (((dsp_bt_t *)dsp_bt)->post_load(dsp_bt) < 0)
+		goto end_L1_defense;
+
+	/*check error status in reset_status[]*/
+	ctrl = ((dsp_bt_t *)dsp_bt)->sh_ctrl_area.vaddr;
+	l1_d = SH_CTRL_VADDR_DSPBT(ctrl->l1d, dsp_bt);
+	i = 0;
+	while (i < NR_DSP_CORE) {
+		if (DspCoreInfo->reDspCoreInfo[i].reset_core_flag) {
+			if (l1_d->reset_status[i] == WARM_RESET_SUCCESS) {
+				printf("Warm reset success on"
+					" core_id = %#x\n", i);
+				i++;
+				continue;
+			} else {
+				if (l1_d->reset_status[i] ==
+				    BEGIN_WARM_RESET_OS_INIT  ||
+				    l1_d->reset_status[i] ==
+				    BEGIN_WARM_RESET_APP_INIT) {
+					puts("Still at BEGIN_WARM_RESET_OS_INIT"
+					" or BEGIN_WARM_RESET_APP_INIT"
+					" sleep 2 sec");
+					sleep(2);
+				}
+
+				if (l1_d->reset_status[i] !=
+				    WARM_RESET_SUCCESS) {
+					ret = l1_d->reset_status[i];
+					printf("warm reset status = %#x\n",
+						ret);
+					/* plz ingnore this for now*/
+					/*goto end_L1_defense;*/
+				}
+			}
+		}
+		i++;
+	}
+
+end_L1_defense:
+	cleanup(((dsp_bt_t *)dsp_bt)->dev_mem,
+		((dsp_bt_t *)dsp_bt)->het_mgr);
+	((dsp_bt_t *)dsp_bt)->het_mgr = -1;
+	((dsp_bt_t *)dsp_bt)->dev_mem = -1;
+	return ret;
+
 }
 #endif

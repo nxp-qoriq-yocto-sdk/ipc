@@ -16,6 +16,7 @@
 #include <signal.h>
 #include <string.h>
 #include <stdint.h>
+#include <pthread.h>
 #include "logdefs.h"
 #include "fsl_het_mgr.h"
 #include "fsl_user_dma.h"
@@ -29,6 +30,7 @@
 #include "fsl_heterogeneous.h"
 #include "fsl_heterogeneous_ipc.h"
 #include "lg_shm.h"
+#include "fsl_L1_defense.h"
 
 #define LOCAL_PRODUCER_NUM pa_reserved[0]
 #define LOCAL_CONSUMER_NUM pa_reserved[1]
@@ -36,6 +38,8 @@
 mem_range_t chvpaddr_arr[TOTAL_IPC_CHANNELS];
 int ch_semid[TOTAL_IPC_CHANNELS];
 extern shm_seg_t shm;
+uint32_t g_core_mask;
+
 /*********** Defines ******************/
 #define MAX_MSG_SIZE 1020
 #define PAGE_SIZE 4096
@@ -1327,6 +1331,8 @@ int fsl_B4_ipc_init(void *dsp_bt)
 
 		ipc->num_ipc_channels = num_channels;
 		ipc->ipc_max_bd_size = channel_depth;
+		ipc->start_validation_value = HET_START_VALID_VALUE;
+		ipc->end_validation_value = HET_END_VALID_VALUE;
 
 		phys_addr1 = ipc_ch_start_paddr +
 			sizeof(os_het_ipc_channel_t)*num_channels;
@@ -1336,6 +1342,8 @@ int fsl_B4_ipc_init(void *dsp_bt)
 		in ipc->channels
 		*/
 		for (i = 0; i < num_channels; i++) {
+			ch[i].start_validation_value = HET_START_VALID_VALUE;
+			ch[i].end_validation_value = HET_END_VALID_VALUE;
 			ch[i].ipc_ind = OS_HET_NO_INT;
 			ch[i].id = i;
 			ch[i].bd_base = phys_addr1;
@@ -1365,6 +1373,8 @@ int fsl_B4_ipc_init(void *dsp_bt)
 
 			ipc->num_ipc_channels = num_channels;
 			ipc->ipc_max_bd_size = channel_depth;
+			ipc->start_validation_value = HET_START_VALID_VALUE;
+			ipc->end_validation_value = HET_END_VALID_VALUE;
 
 			phys_addr1 = ipc_ch_start_paddr +
 				sizeof(os_het_ipc_channel_t)*num_channels;
@@ -1375,6 +1385,10 @@ int fsl_B4_ipc_init(void *dsp_bt)
 			*/
 
 			for (i = 0; i < num_channels; i++) {
+				ch[i].start_validation_value =
+					HET_START_VALID_VALUE;
+				ch[i].end_validation_value =
+					HET_END_VALID_VALUE;
 				ch[i].ipc_ind = OS_HET_NO_INT;
 				ch[i].id = i;
 				ch[i].bd_base = phys_addr1;
@@ -1554,3 +1568,223 @@ int fsl_913x_ipc_init(void *dsp_bt)
 
 	return ERR_SUCCESS;
 }
+
+#ifdef B4860
+int fsl_B4_ipc_reinit(fsl_ipc_t ipc, void *dsp_bt)
+{
+	/* Re create the IPC channels*/
+	l1d_printf("enter func %s\n", __func__);
+	if (ipc) {
+		if (fsl_B4_ipc_init(dsp_bt)) {
+			printf("Error in fsl_B4_ipc_init from %s\n", __func__);
+			return -1;
+		}
+	}
+
+	/* free user space stucture */
+	if (ipc)
+		fsl_ipc_us_reinit(ipc);
+	return ERR_SUCCESS;
+}
+
+int check_validation_fields(uint32_t *sh_ctrl, void *dsp_bt)
+{
+
+	l1d_printf("Enter func %s\n", __func__);
+	uint32_t num_ipc_regions = 0;
+	uint32_t ipc_param_muxed;
+	uint32_t ipc_ch_start_paddr = 0;
+	uint16_t max_num_ipc_channels = MAX_IPC_CHANNELS;
+	uint16_t max_channel_depth = DEFAULT_CHANNEL_DEPTH;
+	int dev_het_mgr = ((dsp_bt_t *)dsp_bt)->het_mgr;
+	ipc_ch_start_paddr = shm.paddr + IPC_METADATA_AREA_PADDR_OFFSET +
+		IPC_HET_T_SZ_1K;
+	l1d_printf("ipc_ch_start_paddr = %x\n", ipc_ch_start_paddr);
+	/* From module params */
+	uint16_t num_channels, channel_depth;
+
+	/* RAT mode*/
+	uint8_t rat_inst = 0;
+
+	int ret = 0, k = 0;
+	int i = 0, size = 0, j = 0;
+
+	/*IPC */
+	os_het_ipc_channel_t *ch;
+	os_het_ipc_t *ipc;
+	os_het_control_t *ctrl = (os_het_control_t *)sh_ctrl;
+
+	/* Create os_het_ipc_t
+	 * sh_ctrl_area is local here
+	 */
+
+	ipc = (os_het_ipc_t *)(shm.vaddr + (uint32_t)ctrl->ipc - shm.paddr);
+	/* Error prone code check here*/
+	uint32_t phys_addr_sh_ctrl =
+		((dsp_bt_t *)dsp_bt)->het_sys_map.sh_ctrl_area.phys_addr;
+	os_het_l1d_t *l1_defense = (os_het_l1d_t *)(
+		ctrl->l1d + ctrl - phys_addr_sh_ctrl);
+	os_het_smartdsp_log_t *smartdsp_debug = (os_het_smartdsp_log_t *)(
+		ctrl->smartdsp_debug + ctrl - phys_addr_sh_ctrl);
+
+
+	/* Get RAT MODE */
+	ret = ioctl(dev_het_mgr,
+		     IOCTL_HET_MGR_GET_RAT_MODE,
+		     &num_ipc_regions);
+	if (ret) {
+		perror("IOCTL_HET_MGR_GET_RAT_MODE:");
+		return -1;
+	} else if (num_ipc_regions == DEFAULT_RAT_INST)
+		rat_inst = 1;
+
+	/* Get IPC_PARAMS */
+	ret = ioctl(dev_het_mgr,
+		     IOCTL_HET_MGR_GET_IPC_PARAMS,
+		     &ipc_param_muxed);
+	if (ret) {
+		perror("IOCTL_HET_MGR_GET_IPC_PARAMS:");
+		return -1;
+	} else {
+		max_num_ipc_channels = ipc_param_muxed & 0x0000FFFF;
+		max_channel_depth = ((ipc_param_muxed & 0xFFFF0000) >> 16);
+	}
+
+	num_channels = max_num_ipc_channels;
+	if (num_channels <= 0) {
+		printf("ipc channel was found to be = %d\n",
+			num_channels);
+		return -1;
+	}
+
+	channel_depth = max_channel_depth;
+	if (channel_depth <= 0) {
+		printf("ipc channel depth value found to be = %d\n",
+			channel_depth);
+		return -1;
+	}
+
+	if (rat_inst == 0) {
+		if (ipc->start_validation_value != HET_START_VALID_VALUE ||
+		    ipc->end_validation_value != HET_END_VALID_VALUE)
+			return OS_HET_ERR_L1D_MEMORY_CORRUPTED;
+
+		ch = (os_het_ipc_channel_t *)
+			(shm.vaddr + ipc_ch_start_paddr - shm.paddr);
+
+		for (i = 0; i < num_channels; i++) {
+			if (ch[i].start_validation_value !=
+			HET_START_VALID_VALUE ||
+			ch[i].end_validation_value !=
+			HET_END_VALID_VALUE)
+				return OS_HET_ERR_L1D_MEMORY_CORRUPTED;
+
+		}
+
+	} else if (rat_inst == 1) {
+
+		/*calculate size of ipc channels*/
+		size = sizeof(os_het_ipc_channel_t)*num_channels +
+		/* array to hold channel pointers */
+			sizeof(os_het_ipc_bd_t)*num_channels*channel_depth;
+		/* ptr channel ring buffer */
+
+
+		for (j = 0; j <= rat_inst; j++) {
+
+			ipc = (void *)(shm.vaddr + (uint32_t)ctrl->ipc -
+				shm.paddr + j*sizeof(os_het_ipc_t));
+
+			ipc_ch_start_paddr += j * size;
+			if (ipc->start_validation_value !=
+			HET_START_VALID_VALUE ||
+			ipc->end_validation_value !=
+			HET_END_VALID_VALUE)
+				return OS_HET_ERR_L1D_MEMORY_CORRUPTED;
+
+			ch = (os_het_ipc_channel_t *)
+				(shm.vaddr + ipc_ch_start_paddr - shm.paddr);
+
+
+			/*
+			In a loop of num_channels, set the ptr of channel
+			structures in ipc->channels
+			*/
+
+			for (i = 0; i < num_channels; i++) {
+				if (ch[i].start_validation_value !=
+				    HET_START_VALID_VALUE ||
+				    ch[i].end_validation_value !=
+				    HET_END_VALID_VALUE)
+					return OS_HET_ERR_L1D_MEMORY_CORRUPTED;
+
+			}
+
+		}
+	}
+
+
+	if (l1_defense->start_validation_value != HET_START_VALID_VALUE ||
+	    l1_defense->end_validation_value != HET_END_VALID_VALUE)
+			return OS_HET_ERR_L1D_MEMORY_CORRUPTED;
+	else if (ctrl->start_validation_value != HET_START_VALID_VALUE ||
+		 ctrl->end_validation_value != HET_END_VALID_VALUE)
+			return OS_HET_ERR_L1D_MEMORY_CORRUPTED;
+	else {
+		for (k = 0; k <= 5; k++) {
+			if (smartdsp_debug[i].start_validation_value !=
+			    HET_START_VALID_VALUE ||
+			    smartdsp_debug[i].end_validation_value !=
+			    HET_END_VALID_VALUE)
+				return OS_HET_ERR_L1D_MEMORY_CORRUPTED;
+			}
+		}
+
+	return ERR_SUCCESS;
+}
+
+void create_ioctl_thread(void *thread_arg)
+{
+	l1d_printf("Enter func %s\n", __func__);
+	fsl_defense_cb cb = thread_arg;
+	uint32_t ret = 0;
+	int dev_fsl_l1d = open("/dev/fsl_l1d", O_RDWR);
+
+	if (dev_fsl_l1d == -1) {
+		printf("Error: Cannot open /dev/fsl_l1d\n");
+		printf("Frm %s\n", __func__);
+		return;
+	}
+
+	l1d_printf("here %s &g_core_mask %p\n", __func__, &g_core_mask);
+
+	while (1) {
+
+		ret = ioctl(dev_fsl_l1d,
+			IOCTL_FSL_L1D_GET_WSRSR_BITMASK,
+			&g_core_mask);
+		l1d_printf("after ioctl %s g_core_mask %#x\n", __func__,
+				g_core_mask);
+
+		if (ret < 0) {
+			perror("IOCTL_FSL_L1D_GET_WSRSR_BITMASK");
+			return;
+		} else if (g_core_mask != 0) {
+			/*Call the call back handler here */
+			l1d_printf("Callback function reached\n");
+			(*cb)(g_core_mask);
+			g_core_mask = 0;
+		}
+	}
+}
+
+void fsl_L1_defense_register_cb(fsl_defense_cb cb)
+{
+	l1d_printf("Enter func %s\n", __func__);
+	pthread_t thread1;
+	pthread_create(&thread1, NULL, (void *)&create_ioctl_thread,
+			(void *)cb);
+	return;
+}
+
+#endif
