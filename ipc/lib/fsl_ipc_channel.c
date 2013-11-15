@@ -1253,6 +1253,8 @@ int fsl_B4_ipc_init(void *dsp_bt)
 		IPC_HET_T_SZ_1K;
 	debug_print("ipc_ch_start_paddr = %x\n", ipc_ch_start_paddr);
 	ipc_het_t_start_paddr = shm.paddr + IPC_METADATA_AREA_PADDR_OFFSET;
+	memset((void *)(shm.vaddr + IPC_METADATA_AREA_PADDR_OFFSET),
+			0, SIZE_1MB);
 	/* From module params */
 	uint16_t num_channels, channel_depth;
 

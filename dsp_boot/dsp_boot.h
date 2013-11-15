@@ -95,5 +95,6 @@ int fsl_start_L1_defense(fsl_ipc_t , dsp_core_info *);
 int fsl_B4_ipc_reinit(fsl_ipc_t , void *);
 int check_validation_fields(uint32_t *, void *);
 #define DSP_BOOT_SUCCESS 2
+#define SIZE_1MB 0x10000
 
 #endif
