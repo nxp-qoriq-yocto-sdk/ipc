@@ -188,6 +188,44 @@ void *map_area64(uint64_t phys_addr, uint64_t  *sz, void *dsp_bt)
 
 }
 
+void *map_area64_cache(uint64_t phys_addr, uint64_t  *sz, void *dsp_bt)
+{
+	int i;
+	void *vaddr = NULL;;
+	uint64_t diff;
+	int size = *sz;
+	uint64_t nphys_addr;
+
+	int mapidx = ((dsp_bt_t *)dsp_bt)->map_id;
+	int dev_fsl_l1d = ((dsp_bt_t *)dsp_bt)->fsl_l1d;
+
+	nphys_addr = phys_addr & MAP_AREA_MASK;
+	if (phys_addr + size > nphys_addr + 0x1000)
+		size = (size + 0x1000) & MAP_AREA_MASK;
+
+	size += 0x1000 - size % 0x1000;
+	diff = phys_addr - nphys_addr;
+
+	for (i = 0; i < mapidx; i++)
+		if (phys_addr >= ((dsp_bt_t *)dsp_bt)->map_d[i].phys_addr &&
+		    phys_addr < ((dsp_bt_t *)dsp_bt)->map_d[i].phys_addr +
+		    ((dsp_bt_t *)dsp_bt)->map_d[i].size) {
+			vaddr = mmap(0, size, (PROT_READ | \
+				PROT_WRITE), MAP_SHARED, \
+					dev_fsl_l1d, nphys_addr);
+			break;
+		}
+
+	if (vaddr) {
+		*sz = size;
+		vaddr += diff;
+		return vaddr;
+	}
+
+	return NULL;
+
+}
+
 void unmap_area(void *vaddr, uint64_t size)
 {
 	munmap((void *)((uint32_t)vaddr & VIR_ADDR32_MASK), size);
@@ -311,6 +349,16 @@ static int init_hetmgr()
 	return dev_het_mgr;
 }
 
+static int init_fsl_l1d()
+{
+	int fsl_l1d = open("/dev/fsl_l1d", O_RDWR);
+	if (fsl_l1d == -1) {
+		printf("Error: Cannot open /dev/fsl_l1d\n");
+		return -1;
+	}
+	return fsl_l1d;
+}
+
 static int assign_memory_areas(void *dsp_bt)
 {
 	reload_print("%s\n", __func__);
@@ -355,7 +403,6 @@ static int load_dsp_image(char *fname, void *dsp_bt)
 	/* Read phys address and size */
 	/* get vaddr from phys addr */
 	/* call copy part */
-
 	FILE *dspbin;
 	uint8_t endian;
 	uint64_t addr;
@@ -408,7 +455,12 @@ static int load_dsp_image(char *fname, void *dsp_bt)
 			}
 			continue;
 		}
-		vaddr = map_area64(addr, &tsize, dsp_bt);
+#ifdef B913x
+			vaddr = map_area64(addr, &tsize, dsp_bt);
+#endif
+#ifdef B4860
+			vaddr = map_area64_cache(addr, &tsize, dsp_bt);
+#endif
 		if (!vaddr) {
 			ret = -1;
 			printf("\n Error in mapping physical address"
@@ -416,7 +468,6 @@ static int load_dsp_image(char *fname, void *dsp_bt)
 			(long long unsigned int)addr, __func__);
 			goto end_close_file;
 		}
-
 		printf("\n Copy Part %llx %llx\n", (long long unsigned int)addr,
 			       (long long unsigned int)size);
 			ret = copy_file_part(vaddr, size, dspbin);
@@ -1226,6 +1277,13 @@ int pre_load_B4(int count, ...)
 		return -1;
 	}
 
+	((dsp_bt_t *)dsp_bt)->fsl_l1d = init_fsl_l1d();
+	if (((dsp_bt_t *)dsp_bt)->fsl_l1d == -1) {
+		printf("Error in open /dev/fsl_l1d\n");
+		printf("frm %s\n", __func__);
+		return -1;
+	}
+
 	ret = ioctl(((dsp_bt_t *)dsp_bt)->het_mgr,
 		    IOCTL_HET_MGR_GET_SYS_MAP,
 		    &((dsp_bt_t *)dsp_bt)->het_sys_map);
@@ -1279,6 +1337,13 @@ int pre_Reload_B4(int count, ...)
 	((dsp_bt_t *)dsp_bt)->dev_mem = init_devmem();
 	if (((dsp_bt_t *)dsp_bt)->dev_mem == -1) {
 		printf("error in dev_mem frm %s\n", __func__);
+		return -1;
+	}
+
+	((dsp_bt_t *)dsp_bt)->fsl_l1d = init_fsl_l1d();
+	if (((dsp_bt_t *)dsp_bt)->fsl_l1d == -1) {
+		printf("Error in open /dev/fsl_l1d\n");
+		printf("frm %s\n", __func__);
 		return -1;
 	}
 
@@ -1432,6 +1497,7 @@ int b4860_load_dsp_image(int argc, dspbt_core_info CoreInfo[])
 
 	((dsp_bt_t *)dsp_bt)->het_mgr = -1;
 	((dsp_bt_t *)dsp_bt)->dev_mem = -1;
+	((dsp_bt_t *)dsp_bt)->fsl_l1d = -1;
 
 	/* Assign func Pointers*/
 	((dsp_bt_t *)dsp_bt)->pre_load = &pre_load_B4;
@@ -1472,6 +1538,7 @@ int b4860_load_dsp_image(int argc, dspbt_core_info CoreInfo[])
 	else {
 		cleanup(((dsp_bt_t *)dsp_bt)->dev_mem,
 			((dsp_bt_t *)dsp_bt)->het_mgr);
+		close(((dsp_bt_t *)dsp_bt)->fsl_l1d);
 		free(dsp_bt);
 		return 0;
 	}
@@ -1479,6 +1546,7 @@ int b4860_load_dsp_image(int argc, dspbt_core_info CoreInfo[])
 end_b4860_load_dsp_image:
 	cleanup(((dsp_bt_t *)dsp_bt)->dev_mem,
 		((dsp_bt_t *)dsp_bt)->het_mgr);
+	close(((dsp_bt_t *)dsp_bt)->fsl_l1d);
 	return -1;
 }
 
@@ -1492,6 +1560,7 @@ int fsl_start_L1_defense(fsl_ipc_t ipc, dsp_core_info *DspCoreInfo)
 
 	((dsp_bt_t *)dsp_bt)->het_mgr = -1;
 	((dsp_bt_t *)dsp_bt)->dev_mem = -1;
+	((dsp_bt_t *)dsp_bt)->fsl_l1d = -1;
 
 	/* Assign func Pointers*/
 	((dsp_bt_t *)dsp_bt)->pre_load = &pre_Reload_B4;
@@ -1513,7 +1582,6 @@ int fsl_start_L1_defense(fsl_ipc_t ipc, dsp_core_info *DspCoreInfo)
 			goto end_L1_defense;
 
 	}
-
 
 	/*shared images loading only for mode 3*/
 	while (i < NR_DSP_CORE) {
@@ -1604,8 +1672,9 @@ int fsl_start_L1_defense(fsl_ipc_t ipc, dsp_core_info *DspCoreInfo)
 end_L1_defense:
 	cleanup(((dsp_bt_t *)dsp_bt)->dev_mem,
 		((dsp_bt_t *)dsp_bt)->het_mgr);
-	((dsp_bt_t *)dsp_bt)->het_mgr = -1;
-	((dsp_bt_t *)dsp_bt)->dev_mem = -1;
+	close(((dsp_bt_t *)dsp_bt)->fsl_l1d);
+	free(dsp_bt);
+
 	return ret;
 
 }

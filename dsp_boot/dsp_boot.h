@@ -49,6 +49,7 @@ typedef void *fsl_ipc_t;
 typedef struct{
 	int het_mgr;
 	int dev_mem;
+	int fsl_l1d;
 	int map_id;
 	sys_map_t het_sys_map;
 	mem_range_t map_d[20];
