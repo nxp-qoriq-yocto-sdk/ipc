@@ -142,6 +142,27 @@ static int fsl_l1d_ioctl(struct inode *inode, struct file *filp,
 	return ret;
 }
 
+static int fsl_l1d_mmap(struct file *filp, struct vm_area_struct *vma)
+{
+	int ret;
+	long length = vma->vm_end - vma->vm_start;
+
+	/*
+	 Protection here is cacheable and coherent
+	 */
+	vma->vm_page_prot |= _PAGE_WRITETHRU;
+	pr_debug("CHACHED WRITETHRU vm_page_prot %lx\n",
+			pgprot_val(vma->vm_page_prot));
+
+	ret = remap_pfn_range(vma, vma->vm_start,
+			      vma->vm_pgoff, length,
+			      vma->vm_page_prot);
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
+
 /*
 file operations data structure
 */
@@ -158,6 +179,7 @@ ioctl :  	fsl_l1d_ioctl,
 #ifdef CONFIG_COMPAT
 compat_ioctl :	fsl_l1d_ioctl,
 #endif
+mmap :	fsl_l1d_mmap
 };
 
 static irqreturn_t fsl_l1d_interrupt_handler(int irq, void *data)
