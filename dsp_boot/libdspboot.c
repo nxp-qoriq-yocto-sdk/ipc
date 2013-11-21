@@ -1029,6 +1029,47 @@ int check_vnmi_ack_B4(void *dsp_bt)
 	} else
 		return 0;
 }
+static int dsp_L2_cache_invalidate_B4(dsp_core_info *DspCoreInfo, void *dsp_bt)
+{
+	l1d_printf("enter func %s\n", __func__);
+
+	sys_map_t *het_sys_map = &((dsp_bt_t *)dsp_bt)->het_sys_map;
+	uint64_t size = het_sys_map->pa_ccsrbar.size;
+	volatile uint32_t *vaddr = NULL;
+
+	/*map to this value phys_addr = 0xffe000000*/
+	uint64_t phys_addr = het_sys_map->pa_ccsrbar.phys_addr;
+
+	vaddr = map_area64(phys_addr, &size, dsp_bt);
+	if (!vaddr) {
+		printf("\nError in mapping physical address %llx to virtual"
+		       "address from func %s\n",
+		       (long long unsigned int)phys_addr, __func__);
+		return -1;
+	}
+
+	l1d_printf("%s: before L2_CACHE_2=0x%x\n", __func__,
+			*(vaddr + L2_CACHE_2));
+	l1d_printf("L2_CACHE_INVALIDATE_MASK %x\n", L2_CACHE_INVALIDATE_MASK);
+	l1d_printf("L2_CACHE_FLUSH_MASK %x\n", L2_CACHE_FLUSH);
+
+	if (DspCoreInfo->reset_mode == MODE_3_ACTIVE) {
+		*(vaddr + L2_CACHE_2) |= L2_CACHE_INVALIDATE_MASK;
+		asm("lwsync");
+		*(vaddr + L2_CACHE_3) |= L2_CACHE_INVALIDATE_MASK;
+		asm("lwsync");
+		*(vaddr + L2_CACHE_4) |= L2_CACHE_INVALIDATE_MASK;
+		asm("lwsync");
+		puts("L2 cache invalidated");
+	}
+
+	sleep(1);
+	l1d_printf("%s: L2_CACHE_2=0x%x\n", __func__, *(vaddr + L2_CACHE_2));
+	l1d_printf("%s: L2_CACHE_3=0x%x\n", __func__, *(vaddr + L2_CACHE_3));
+	l1d_printf("%s: L2_CACHE_4=0x%x\n", __func__, *(vaddr + L2_CACHE_4));
+	unmap_area((void *)vaddr, size);
+	return 0;
+}
 
 static int set_PH15_on_dspcore_B4(dsp_core_info *DspCoreInfo, void *dsp_bt)
 {
@@ -1403,6 +1444,7 @@ int pre_Reload_B4(int count, ...)
 	}
 
 	set_PH15_on_dspcore_B4(DspCoreInfo, dsp_bt);
+	dsp_L2_cache_invalidate_B4(DspCoreInfo, dsp_bt);
 
 	if (DspCoreInfo->reset_mode == MODE_3_ACTIVE) {
 		if (reset_het_structures_B4(dsp_bt) < 0) {

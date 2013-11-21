@@ -28,6 +28,11 @@
 #define PCPH15CLRR (0xE20B8/4)
 #define PIR (0x41090/4)
 #define DCFG_CRSTSR	(0xE0410/4)
+#define L2_CACHE_2	(0xC60000/4)
+#define L2_CACHE_3	(0xCA0000/4)
+#define L2_CACHE_4	(0xCE0000/4)
+#define L2_CACHE_INVALIDATE_MASK (1 << 21)
+#define L2_CACHE_FLUSH (1 << 11)
 #define NR_DSP_CORE	6
 /* VTB flush*/
 #define CNPC_PHYSICAL_ADDR          0xF00001000
