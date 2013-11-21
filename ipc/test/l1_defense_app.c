@@ -74,13 +74,21 @@ void l1d_callback(uint32_t core_mask1)
 int main(int argc, char **argv)
 {
 	if (argc > 3 || argc == 2) {
-		printf("Usage:\n %s <rat_id> <ipc_in_use>\n", argv[0]);
+		printf("Usage:\n %s <single core/multi core> <ipc in use>\n",
+				argv[0]);
+		printf("Where as,\n 0: single core\n 1: multi core\n");
+		printf(" 0: IPC not used\n 1: IPC used\n\n");
 		printf("OR \nUsage:\n %s\n", argv[0]);
+		printf("Where as,\n \"%s\" means <single core> <ipc not"
+				" used>\n", argv[0]);
+		printf(" Same as \"%s 0 0\"\n", argv[0]);
 		goto end;
 	}
 	if (argc == 1) {
 		rat_id = 0;
-		ipc_in_use = 1;
+		ipc_in_use = 0;
+		printf("\nOnly 1 argument means <single core> and "
+				"<IPC not used>\n");
 	} else if (argc == 3)
 		rat_id = atoi(argv[1]);
 		ipc_in_use = atoi(argv[2]);
@@ -159,15 +167,19 @@ void test_init(int rat_id)
 		DspCoreInfo->reDspCoreInfo[i].core_id = i;
 	}
 	puts("Enter your choice");
+	puts(" 0 means not in use for all Parameters"
+			"\n Only Values mentioned below are valid,"
+			" rest all values are invalid\n");
 	puts("WARM_RESET_MODE <0x1,0x2,0x3>\nMAPLE_RESET_MODE <0x0,0x2,0x4"
 			",0x8,0x6,0xA,0xC,0xE>\n"
-			"debug_print <0x0,0x1>\nHW_SEM_NUM<0x0,0x1>\n"
+			"Debug_print <0x0,0x1>\nHW_SEM_NUM <0x0,0x1,"
+			"0x2,0x3,0x4,0x5,0x6,0x7>\n"
 			"Number of Shared images <0x0,0x1,0x2,0x3,0x4>");
 	scanf("%x %x %x %x %x", &warm_reset_mode, &maple_reset_mode,
 		&debug_print, &hw_sem, &nr_sh);
 
 	if ((ipc_in_use == 1) && (rat_id == 1)) {
-		puts("NR_DSP_CORE <0x2,0x6>");
+		puts("\nNR_DSP_CORE <0x2,0x6>");
 		scanf("%x", &nr_dsp_core);
 	} else
 		nr_dsp_core = 6;
