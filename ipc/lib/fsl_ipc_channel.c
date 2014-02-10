@@ -252,10 +252,11 @@ int fsl_ipc_configure_channel(uint32_t channel_id, uint32_t depth,
 			goto end;
 		}
 		ch->ch_type = channel_type;
-		if (channel_type == IPC_MSG_CH)
+		if (channel_type == IPC_MSG_CH) {
 			ipc_channel_attach_msg_ring(channel_id, msg_ring_paddr,
 					msg_size, ipc_priv);
-
+			ch->max_msg_size = msg_size;
+		}
 		ch->ipc_ind = OS_HET_NO_INT;
 	}
 
@@ -419,7 +420,13 @@ int fsl_ipc_send_tx_req(uint32_t channel_id, sg_list_t *sgl,
 
 	debug_print("copying %x to %x length %x\n",
 			vaddr, tx_req_vaddr, tx_req_len);
-	memcpy(vaddr, tx_req_vaddr, tx_req_len);
+	if (tx_req_len <= MAX_TX_REQ_MSG_SIZE)
+		memcpy(vaddr, tx_req_vaddr, tx_req_len);
+	else {
+		ret = -ERR_MAX_MSG_SIZE_EXCD_TXREQ;
+		printf("%s: -ERR_MAX_MSG_SIZE_EXCD_TXREQ hit\n", __func__);
+		goto end;
+	}
 
 	/*OLD	phys_addr = ipc_priv->txreq_tb_lbuff_paddr +
 	  ipc_ch->tracker.producer_num*ipc_priv->max_txreq_lbuff_size;*/
@@ -763,8 +770,14 @@ int fsl_ipc_send_msg(uint32_t channel_id, void *src_buf_addr, uint32_t len,
 		goto end;
 	}
 
-	memcpy(vaddr, src_buf_addr, len);
-	bd->msg_len = len;
+	if (len <= ipc_ch->max_msg_size) {
+		memcpy(vaddr, src_buf_addr, len);
+		bd->msg_len = len;
+	} else {
+		ret = -ERR_MAX_MSG_SIZE_EXCD;
+		printf("%s: -ERR_MAX_MSG_SIZE_EXCD reached\n", __func__);
+		goto end;
+	}
 
 	OS_HET_INCREMENT_PRODUCER(ipc_ch);
 	ipc_ch->LOCAL_PRODUCER_NUM = (ipc_ch->LOCAL_PRODUCER_NUM + 1) %
