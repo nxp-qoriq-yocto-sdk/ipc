@@ -48,7 +48,7 @@ typedef enum {
 	NO_WARM_RESET = 0x0,
 	MODE_1_ACTIVE = 0x1, /* L1 scenrio mode 1 */
 	MODE_2_ACTIVE = 0x2, /* L1 scenrio mode 2 */
-	MODE_3_ACTIVE = 0x3  /* L1 scenrio mode 3 */
+	MODE_3_ACTIVE = 0x4  /* L1 scenrio mode 3 */
 } os_het_l1d_mode_t;
 
 /*************************************************************************
