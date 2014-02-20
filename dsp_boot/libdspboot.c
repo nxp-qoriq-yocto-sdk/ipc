@@ -40,7 +40,7 @@
 #ifdef B4860
 static int DCFG_BRR_mask;
 static int GIC_VIGR_VALUE;
-static int GIC_VIGR_VALUE_ARR[6] = {0x000, 0x001, 0x002, 0x003, 0x004, 0x005};
+static int GIC_VIGR_VALUE_ARR[6] = {0x302, 0x303, 0x304, 0x305, 0x306, 0x307};
 #define SH_CTRL_VADDR_DSPBT(A, B) \
 		(void *)((unsigned long)(A) \
 		- ((dsp_bt_t *)(B))->sh_ctrl_area.phys_addr \
