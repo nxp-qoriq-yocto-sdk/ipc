@@ -40,4 +40,8 @@
 #define ERR_INCORRECT_RAT_MODE			27
 #define ERR_MAX_MSG_SIZE_EXCD			28
 #define ERR_MAX_MSG_SIZE_EXCD_TXREQ		29
+/*
+ * ERR_L1_DEFENSE_API_FAIL			30
+ * used in dsp_boot.h
+ */
 #endif /* FSL_PSC913X_IPC_ERRORCODES_H_ */

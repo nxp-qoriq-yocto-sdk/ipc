@@ -994,7 +994,7 @@ int check_dsp_boot_B4(void *dsp_bt)
 		while (!sem_val) {
 			sem_val = *(vaddr + hw_sem_offset);
 			/* sleep for 1 sec*/
-			puts("sleep 1");
+			puts("sleep 1, waiting for hw sem");
 			sleep(1);
 		}
 
@@ -1248,7 +1248,6 @@ static int check_dsp_ready_CRSTSR_B4(dsp_core_info *DspCoreInfo, void *dsp_bt)
 
 		i++;
 	}
-
 	unmap_area((void *)vaddr, size);
 	return 0;
 }
@@ -1456,10 +1455,12 @@ int pre_Reload_B4(int count, ...)
 			return -1;
 		}
 	} else {
-		ret = check_validation_fields(ctrl, dsp_bt);
-		if (ret != 0)
+		ret = check_validation_fields(dsp_bt);
+		if (ret != 0) {
+			printf("Error in check_validation_fields frm"
+			       " %s ret=(%i)\n", __func__, ret);
 			return ret;
-
+		}
 	}
 
 	set_reset_modes_B4(DspCoreInfo, dsp_bt);
@@ -1671,10 +1672,12 @@ int fsl_start_L1_defense(fsl_ipc_t ipc, dsp_core_info *DspCoreInfo)
 		goto end_L1_defense;
 	}
 
-	/* copy semaphore number*/
-	((dsp_bt_t *)dsp_bt)->semaphore_num = DspCoreInfo->hw_sem_num;
-	if (((dsp_bt_t *)dsp_bt)->post_load(dsp_bt) < 0)
-		goto end_L1_defense;
+	if (DspCoreInfo->reset_mode == MODE_3_ACTIVE ||
+	    DspCoreInfo->reset_mode == MODE_2_ACTIVE) {
+		((dsp_bt_t *)dsp_bt)->semaphore_num = DspCoreInfo->hw_sem_num;
+		if (((dsp_bt_t *)dsp_bt)->post_load(dsp_bt) < 0)
+			goto end_L1_defense;
+	}
 
 	/*check error status in reset_status[]*/
 	ctrl = ((dsp_bt_t *)dsp_bt)->sh_ctrl_area.vaddr;
@@ -1711,7 +1714,10 @@ int fsl_start_L1_defense(fsl_ipc_t ipc, dsp_core_info *DspCoreInfo)
 		i++;
 	}
 
+goto L1_defense_success;
 end_L1_defense:
+	ret = -ERR_L1_DEFENSE_API_FAIL;
+L1_defense_success:
 	cleanup(((dsp_bt_t *)dsp_bt)->dev_mem,
 		((dsp_bt_t *)dsp_bt)->het_mgr);
 	close(((dsp_bt_t *)dsp_bt)->fsl_l1d);

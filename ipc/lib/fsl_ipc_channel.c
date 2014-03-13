@@ -1602,7 +1602,7 @@ int fsl_B4_ipc_reinit(fsl_ipc_t ipc, void *dsp_bt)
 	return ERR_SUCCESS;
 }
 
-int check_validation_fields(uint32_t *sh_ctrl, void *dsp_bt)
+int check_validation_fields(void *dsp_bt)
 {
 
 	l1d_printf("Enter func %s\n", __func__);
@@ -1627,7 +1627,8 @@ int check_validation_fields(uint32_t *sh_ctrl, void *dsp_bt)
 	/*IPC */
 	os_het_ipc_channel_t *ch;
 	os_het_ipc_t *ipc;
-	os_het_control_t *ctrl = (os_het_control_t *)sh_ctrl;
+	os_het_control_t *ctrl;
+	ctrl = (os_het_control_t *)((dsp_bt_t *)dsp_bt)->sh_ctrl_area.vaddr;
 
 	/* Create os_het_ipc_t
 	 * sh_ctrl_area is local here
@@ -1638,10 +1639,11 @@ int check_validation_fields(uint32_t *sh_ctrl, void *dsp_bt)
 	uint32_t phys_addr_sh_ctrl =
 		((dsp_bt_t *)dsp_bt)->het_sys_map.sh_ctrl_area.phys_addr;
 	os_het_l1d_t *l1_defense = (os_het_l1d_t *)(
-		ctrl->l1d + ctrl - phys_addr_sh_ctrl);
+		((dsp_bt_t *)dsp_bt)->sh_ctrl_area.vaddr + ctrl->l1d -
+		phys_addr_sh_ctrl);
 	os_het_smartdsp_log_t *smartdsp_debug = (os_het_smartdsp_log_t *)(
-		ctrl->smartdsp_debug + ctrl - phys_addr_sh_ctrl);
-
+		((dsp_bt_t *)dsp_bt)->sh_ctrl_area.vaddr +
+		ctrl->smartdsp_debug - phys_addr_sh_ctrl);
 
 	/* Get RAT MODE */
 	ret = ioctl(dev_het_mgr,
@@ -1720,7 +1722,6 @@ int check_validation_fields(uint32_t *sh_ctrl, void *dsp_bt)
 			ch = (os_het_ipc_channel_t *)
 				(shm.vaddr + ipc_ch_start_paddr - shm.paddr);
 
-
 			/*
 			In a loop of num_channels, set the ptr of channel
 			structures in ipc->channels
@@ -1740,21 +1741,33 @@ int check_validation_fields(uint32_t *sh_ctrl, void *dsp_bt)
 
 
 	if (l1_defense->start_validation_value != HET_START_VALID_VALUE ||
-	    l1_defense->end_validation_value != HET_END_VALID_VALUE)
+	    l1_defense->end_validation_value != HET_END_VALID_VALUE) {
+			puts("Error in validation field of os_het_l1d_t");
+			printf("start=%x stop=%x\n",
+				   l1_defense->start_validation_value,
+				   l1_defense->end_validation_value);
 			return OS_HET_ERR_L1D_MEMORY_CORRUPTED;
-	else if (ctrl->start_validation_value != HET_START_VALID_VALUE ||
-		 ctrl->end_validation_value != HET_END_VALID_VALUE)
+	} else if (ctrl->start_validation_value != HET_START_VALID_VALUE ||
+		   ctrl->end_validation_value != HET_END_VALID_VALUE) {
+			puts("Error in validation field of os_het_control_t"
+			     " structure");
+			printf("start=%x end=%x\n",
+				ctrl->start_validation_value,
+				ctrl->end_validation_value);
 			return OS_HET_ERR_L1D_MEMORY_CORRUPTED;
-	else {
+	} else {
 		for (k = 0; k <= 5; k++) {
-			if (smartdsp_debug[i].start_validation_value !=
+			if (smartdsp_debug[k].start_validation_value !=
 			    HET_START_VALID_VALUE ||
-			    smartdsp_debug[i].end_validation_value !=
-			    HET_END_VALID_VALUE)
+			    smartdsp_debug[k].end_validation_value !=
+			    HET_END_VALID_VALUE) {
+				puts("Error in validation field of"
+				     " smartdsp_debug");
 				return OS_HET_ERR_L1D_MEMORY_CORRUPTED;
+				}
 			}
 		}
-
+	puts("Check validation field succeeded");
 	return ERR_SUCCESS;
 }
 

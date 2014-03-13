@@ -94,8 +94,9 @@ int b4860_load_dsp_image(int , dspbt_core_info []);
 int fsl_restart_L1(fsl_ipc_t, char*);
 int fsl_start_L1_defense(fsl_ipc_t , dsp_core_info *);
 int fsl_B4_ipc_reinit(fsl_ipc_t , void *);
-int check_validation_fields(uint32_t *, void *);
+int check_validation_fields(void *);
 #define DSP_BOOT_SUCCESS 2
+#define ERR_L1_DEFENSE_API_FAIL 30
 #define SIZE_1MB 0x10000
 
 #endif
