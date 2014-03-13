@@ -112,10 +112,8 @@ typedef struct {
     /* SET BY DSP: Size of the shared memory for control information in
      * bytes - Mimumum size is 4 KB set by PA*/
     uint32_t                shared_ctrl_size;
-#ifdef CONFIG_MULTI_RAT
     /* Number of IPC regions - only for multimode usages */
     uint32_t                num_ipc_regions;
-#endif
     uint32_t		    end_validation_value;
 } os_het_control_t;
 

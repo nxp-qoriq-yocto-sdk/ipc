@@ -35,7 +35,6 @@
 #define __FSL_HETEROGENOUS_L1_DEFENSE_H
 
 #ifdef B4860
-#include "fsl_heterogeneous_common.h"
 
 #define MAX_NUM_OF_DSP_CORES 6
 
