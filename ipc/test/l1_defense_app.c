@@ -115,6 +115,7 @@ void test_init(int rat_id)
 	uint32_t warm_reset_mode = 3 , maple_reset_mode = 0;
 	uint32_t hw_sem = 0, debug_print = 0;
 	uint32_t nr_sh = 0;
+	uint32_t b4420 = 0;
 	mem_range_t sh_ctrl;
 	mem_range_t dsp_ccsr;
 	mem_range_t pa_ccsr;
@@ -171,6 +172,9 @@ void test_init(int rat_id)
 		DspCoreInfo->reDspCoreInfo[i].dsp_filename =
 					(dsp_image_name[i]);
 		DspCoreInfo->reDspCoreInfo[i].core_id = i;
+		/* memset reset_core_flag */
+		DspCoreInfo->reDspCoreInfo[i].reset_core_flag = 0;
+		DspCoreInfo->shDspCoreInfo[i].reset_core_flag = 0;
 	}
 	puts("Enter your choice");
 	puts(" 0 means not in use for all Parameters"
@@ -190,12 +194,16 @@ void test_init(int rat_id)
 	    warm_reset_mode == MODE_3_ACTIVE))
 		usage("warm_reset_mode");
 
-	if ((ipc_in_use == 1) && (rat_id == 1)) {
+	puts("Is it B4420 ? <0x0, 0x1>");
+	scanf("%x", &b4420);
+	if (b4420 == 1)
+		nr_dsp_core = 2;
+	else if ((ipc_in_use == 1) && (rat_id == 1)) {
 		puts("\nNR_DSP_CORE <0x2,0x6>");
 		scanf("%x", &nr_dsp_core);
-	} else
-		nr_dsp_core = 6;
-
+		} else
+			nr_dsp_core = 6;
+	l1d_printf("nr_dsp_core = %x\n", nr_dsp_core);
 	for (i = 0; i < nr_sh; i++) {
 		DspCoreInfo->shDspCoreInfo[i].reset_core_flag = 1;
 		DspCoreInfo->shDspCoreInfo[i].dsp_filename = malloc(2000);
