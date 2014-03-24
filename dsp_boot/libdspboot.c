@@ -623,6 +623,8 @@ int send_vnmi_func(void *dsp_bt)
 		return -1;
 	}
 	*(int *)vaddr |= GIC_VIGR_VALUE;
+	unmap_area((void *)vaddr, size);
+
 	return 0;
 
 }
@@ -1289,11 +1291,16 @@ void flush_cnpc()
 
 	if (cnpc_dcsr == MAP_FAILED) {
 		printf("error in mmap (dcsr) frm %s\n", __func__);
+		close(mem_fd);
 		return;
 	}
 
 	/* flush Central Nexus Port Controller by setting C-OQCR[AFA]*/
 	cnpc_dcsr[DCSR_CNPC_OQCR_OFFSET] |= DCSR_CNPC_OQCR_AFA_MASK;
+
+	munmap((void *)cnpc_dcsr, NPC_REGS_SIZE);
+	close(mem_fd);
+
 	return;
 }
 
@@ -1706,8 +1713,6 @@ int fsl_start_L1_defense(fsl_ipc_t ipc, dsp_core_info *DspCoreInfo)
 					ret = l1_d->reset_status[i];
 					printf("warm reset status = %#x\n",
 						ret);
-					/* plz ingnore this for now*/
-					/*goto end_L1_defense;*/
 				}
 			}
 		}
@@ -1718,6 +1723,8 @@ goto L1_defense_success;
 end_L1_defense:
 	ret = -ERR_L1_DEFENSE_API_FAIL;
 L1_defense_success:
+	unmap_area(((dsp_bt_t *)dsp_bt)->sh_ctrl_area.vaddr,
+		   ((dsp_bt_t *)dsp_bt)->sh_ctrl_area.size);
 	cleanup(((dsp_bt_t *)dsp_bt)->dev_mem,
 		((dsp_bt_t *)dsp_bt)->het_mgr);
 	close(((dsp_bt_t *)dsp_bt)->fsl_l1d);
