@@ -168,7 +168,6 @@ void test_init(int rat_id)
 	}
 
 	for (i = 0; i <= 5; i++) {
-		DspCoreInfo->reDspCoreInfo[i].dsp_filename = malloc(2000);
 		DspCoreInfo->reDspCoreInfo[i].dsp_filename =
 					(dsp_image_name[i]);
 		DspCoreInfo->reDspCoreInfo[i].core_id = i;
@@ -206,7 +205,6 @@ void test_init(int rat_id)
 	l1d_printf("nr_dsp_core = %x\n", nr_dsp_core);
 	for (i = 0; i < nr_sh; i++) {
 		DspCoreInfo->shDspCoreInfo[i].reset_core_flag = 1;
-		DspCoreInfo->shDspCoreInfo[i].dsp_filename = malloc(2000);
 		DspCoreInfo->shDspCoreInfo[i].dsp_filename =
 					(shared_image_name[i]);
 		DspCoreInfo->shDspCoreInfo[i].core_id = -1;
