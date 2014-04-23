@@ -63,6 +63,7 @@ static void __iomem	*vaddr_wsrsr;
 static spinlock_t sp;
 static wait_queue_head_t wq;
 static uint32_t wsrsr_bitmask;
+static uint32_t 	virq;
 
 #define MPIC_WSRSR 0xFFE043A00
 
@@ -196,7 +197,6 @@ static irqreturn_t fsl_l1d_interrupt_handler(int irq, void *data)
 
 static int mpic_watchdog_init(irq_hw_number_t irqnum)
 {
-	uint32_t virq;
 	int ret = 0;
 
 	pr_debug("Enter func %s\n", __func__);
@@ -280,7 +280,7 @@ end_l1d:
 
 static void fsl_l1d_exit(void)
 {
-	free_irq(FSL_MPIC_WATCHDOG_IRQ, NULL);
+	free_irq(virq, NULL);
 	cdev_del(&fsl_l1d_cdev);
 	unregister_chrdev_region(fsl_l1d_dev, 1);
 }
