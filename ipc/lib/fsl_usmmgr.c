@@ -24,6 +24,7 @@
 
 #define BSC9132_MODEL_STR	"fsl,bsc9132"
 #define B4860QDS_MODEL_STR	"fsl,B4860QDS"
+#define B4420QDS_MODEL_STR	"fsl,B4420QDS"
 #define SIZE_4GB       (0x100000000)
 
 #define SMAP(I, A, B, C) do {	\
@@ -199,7 +200,8 @@ int map_shared_mem(usmmgr_priv *priv)
 			priv->het_sys_map.dsp_m3.size);
 		if (vaddr == MAP_FAILED)
 			return -1;
-	} else if (!memcmp(model_str, B4860QDS_MODEL_STR, bytes)) {
+	} else if ((!memcmp(model_str, B4860QDS_MODEL_STR, bytes)) ||
+		  (!memcmp(model_str, B4420QDS_MODEL_STR, bytes))) {
 			MMAP(priv->het_sys_map.dsp_m3.phys_addr,
 			priv->het_sys_map.dsp_m3.size);
 			if (vaddr == MAP_FAILED)
