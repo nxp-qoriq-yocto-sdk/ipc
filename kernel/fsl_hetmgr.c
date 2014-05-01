@@ -377,6 +377,7 @@ int get_het_sys_map(sys_map_t *sysmap)
 	sysmap->dsp_core0_m2.size = DSP_CORE0_M2_SZ;
 #endif
 	if ((of_find_compatible_node(NULL, NULL, "fsl,bsc9132qds")) ||
+	   (of_find_compatible_node(NULL, NULL, "fsl,B4420QDS")) ||
 	   (of_find_compatible_node(NULL, NULL, "fsl,B4860QDS"))) {
 #ifdef DSP_CORE1_M2
 		sysmap->dsp_core1_m2.phys_addr = DSP_CORE1_M2;
