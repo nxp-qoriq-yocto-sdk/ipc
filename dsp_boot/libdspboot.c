@@ -37,7 +37,9 @@
 
 /* DSP CCSR */
 #define DSP_GCR	0x18000
+
 #ifdef B4860
+#define B4860QDS_MODEL_STR	"fsl,B4860QDS"
 static int DCFG_BRR_mask;
 static int GIC_VIGR_VALUE;
 static int GIC_VIGR_VALUE_ARR[6] = {0x302, 0x303, 0x304, 0x305, 0x306, 0x307};
@@ -1038,9 +1040,29 @@ static int dsp_L2_cache_invalidate_B4(dsp_core_info *DspCoreInfo, void *dsp_bt)
 	sys_map_t *het_sys_map = &((dsp_bt_t *)dsp_bt)->het_sys_map;
 	uint64_t size = het_sys_map->pa_ccsrbar.size;
 	volatile uint32_t *vaddr = NULL;
+	int ret = 0;
+	FILE *fp;
+	char model_str[16] = {0};
+	int bytes =  strlen(B4860QDS_MODEL_STR);
 
 	/*map to this value phys_addr = 0xffe000000*/
 	uint64_t phys_addr = het_sys_map->pa_ccsrbar.phys_addr;
+
+	/* open /proc/device-tree/model to find
+	b4860/b4420
+	*/
+	fp = fopen("/proc/device-tree/model", "rb");
+	if (!fp) {
+		printf("Unable to open /proc/device-tree/model\n");
+		ret = -1;
+		goto end_L2_INVALIDATE;
+	}
+
+	ret = fread(model_str, bytes, 1, fp);
+	fclose(fp);
+
+	if (!ret)
+		goto end_L2_INVALIDATE;
 
 	vaddr = map_area64(phys_addr, &size, dsp_bt);
 	if (!vaddr) {
@@ -1058,19 +1080,32 @@ static int dsp_L2_cache_invalidate_B4(dsp_core_info *DspCoreInfo, void *dsp_bt)
 	if (DspCoreInfo->reset_mode == MODE_3_ACTIVE) {
 		*(vaddr + L2_CACHE_2) |= L2_CACHE_INVALIDATE_MASK;
 		asm("lwsync");
-		*(vaddr + L2_CACHE_3) |= L2_CACHE_INVALIDATE_MASK;
-		asm("lwsync");
-		*(vaddr + L2_CACHE_4) |= L2_CACHE_INVALIDATE_MASK;
-		asm("lwsync");
-		puts("L2 cache invalidated");
+
+		puts("L2 cache cluster2 invalidated");
+
+		if (!memcmp(model_str, B4860QDS_MODEL_STR, bytes)) {
+			*(vaddr + L2_CACHE_3) |= L2_CACHE_INVALIDATE_MASK;
+			asm("lwsync");
+			*(vaddr + L2_CACHE_4) |= L2_CACHE_INVALIDATE_MASK;
+			asm("lwsync");
+			puts("L2 cache cluster3&4 invalidated");
+		}
+
 	}
 
 	sleep(1);
 	l1d_printf("%s: L2_CACHE_2=0x%x\n", __func__, *(vaddr + L2_CACHE_2));
-	l1d_printf("%s: L2_CACHE_3=0x%x\n", __func__, *(vaddr + L2_CACHE_3));
-	l1d_printf("%s: L2_CACHE_4=0x%x\n", __func__, *(vaddr + L2_CACHE_4));
+	if (!memcmp(model_str, B4860QDS_MODEL_STR, bytes)) {
+		l1d_printf("%s: L2_CACHE_3=0x%x\n", __func__,
+				*(vaddr + L2_CACHE_3));
+		l1d_printf("%s: L2_CACHE_4=0x%x\n", __func__,
+				*(vaddr + L2_CACHE_4));
+	}
+
 	unmap_area((void *)vaddr, size);
-	return 0;
+end_L2_INVALIDATE:
+
+	return ret;
 }
 
 static int set_PH15_on_dspcore_B4(dsp_core_info *DspCoreInfo, void *dsp_bt)
@@ -1449,8 +1484,15 @@ int pre_Reload_B4(int count, ...)
 		}
 	}
 
-	set_PH15_on_dspcore_B4(DspCoreInfo, dsp_bt);
-	dsp_L2_cache_invalidate_B4(DspCoreInfo, dsp_bt);
+	if (set_PH15_on_dspcore_B4(DspCoreInfo, dsp_bt) < 0) {
+		printf("Error in set_PH15_on_dspcore_B4 %s\n", __func__);
+		return -1;
+	}
+
+	if (dsp_L2_cache_invalidate_B4(DspCoreInfo, dsp_bt) < 0) {
+		printf("Error in dsp_L2_cache_invalidate_B4 %s\n", __func__);
+		return -1;
+	}
 
 	if (DspCoreInfo->reset_mode == MODE_3_ACTIVE) {
 		if (reset_het_structures_B4(dsp_bt) < 0) {
