@@ -39,8 +39,6 @@ int ipc_in_use;
 static uint32_t core_mask;
 static uint32_t nr_dsp_core;
 dsp_core_info *DspCoreInfo;
-static int cntr;
-static char infinite_loop;
 
 static void usage(char arg[30])
 {
@@ -54,38 +52,6 @@ void l1d_callback(uint32_t core_mask1)
 {
 	int i;
 	core_mask = core_mask1;
-	char end_test;
-	uint32_t warm_reset_mode = DspCoreInfo->reset_mode;
-
-	if (cntr == -1 && (infinite_loop == 'n' || infinite_loop == 'N')) {
-		uint32_t maple_reset_mode = 0;
-		uint32_t debug_print = 0;
-
-		puts("\n\nEnter your New choice");
-		puts(" 0 means not in use for all Parameters"
-			"\n Only Values mentioned below are valid,"
-			" rest all values are invalid\n");
-		puts("WARM_RESET_MODE <1 or 2 or 3>"
-		     " Enter value as <0x1, 0x2, 0x4>"
-			"\nMAPLE_RESET_MODE <0x0,0x2,0x4"
-			",0x8,0x6,0xA,0xC,0xE>\n"
-			"Debug_print <0x0,0x1>");
-		scanf("%x %x %x", &warm_reset_mode, &maple_reset_mode,
-		&debug_print);
-
-		if (!(warm_reset_mode == MODE_1_ACTIVE ||
-		     warm_reset_mode == MODE_2_ACTIVE ||
-		     warm_reset_mode == MODE_3_ACTIVE))
-			usage("warm_reset_mode");
-
-		puts("\nNumber of times you want to run this test?");
-		scanf("%d", &cntr);
-
-		DspCoreInfo->reset_mode = warm_reset_mode;
-		DspCoreInfo->maple_reset_mode = maple_reset_mode;
-		DspCoreInfo->debug_print = debug_print;
-	}
-
 	for (i = 0; i < nr_dsp_core; i++) {
 		if (core_mask & dsp_wsrsr_core_mask[i])
 			DspCoreInfo->reDspCoreInfo[i].reset_core_flag = 1;
@@ -99,45 +65,18 @@ void l1d_callback(uint32_t core_mask1)
 
 	}
 
-	if (infinite_loop == 'n' || infinite_loop == 'N') {
-		if (core_mask != 0) {
-			for (; cntr-- > 0;) {
-				if (ipc_in_use)
-					fsl_start_L1_defense(ipc, DspCoreInfo);
-				else
-					fsl_start_L1_defense(NULL, DspCoreInfo);
+	if (core_mask != 0) {
+		if (ipc_in_use)
+			fsl_start_L1_defense(ipc, DspCoreInfo);
+		else
+			fsl_start_L1_defense(NULL, DspCoreInfo);
 
-				puts("sleep 5 sec");
-				sleep(5);
-			}
-		}
-	} else {
-		if (core_mask != 0) {
-			if (ipc_in_use)
-				fsl_start_L1_defense(ipc, DspCoreInfo);
-			else
-				fsl_start_L1_defense(NULL, DspCoreInfo);
+		puts("sleep 5 sec");
+		sleep(5);
 
-			puts("sleep 5 sec");
-			sleep(5);
-		}
 	}
-
-	if (cntr == -1 && (infinite_loop == 'n' || infinite_loop == 'N')) {
-		puts("\nEnd this test ?(y/n)");
-		scanf(" %c", &end_test);
-		if (end_test == 'y' || end_test == 'Y') {
-			/* Kill parent thread with exit
-			pthread_join(thread1, NULL);
-			perror("pthread_join ret value=\n");
-			*/
-			exit(0);
-		}
-	}
-
 	return;
 }
-
 int main(int argc, char **argv)
 {
 	if (argc > 3 || argc == 2) {
@@ -173,7 +112,7 @@ void *test_p2v(unsigned long phys_addr)
 void test_init(int rat_id)
 {
 	int ret = 0, i = 0;
-	uint32_t warm_reset_mode = MODE_3_ACTIVE , maple_reset_mode = 0;
+	uint32_t warm_reset_mode = 3 , maple_reset_mode = 0;
 	uint32_t hw_sem = 0, debug_print = 0;
 	uint32_t nr_sh = 0;
 	uint32_t b4420 = 0;
@@ -269,14 +208,6 @@ void test_init(int rat_id)
 		DspCoreInfo->shDspCoreInfo[i].dsp_filename =
 					(shared_image_name[i]);
 		DspCoreInfo->shDspCoreInfo[i].core_id = -1;
-	}
-
-	puts("\nRun it for infinite loop? (y/n)");
-	/* \n is taken as input so add space */
-	scanf(" %c", &infinite_loop);
-	if (infinite_loop == 'n' || infinite_loop == 'N') {
-		puts("Number of times you want to run this test?");
-		scanf("%d", &cntr);
 	}
 
 
