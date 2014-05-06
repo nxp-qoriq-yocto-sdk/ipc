@@ -9,8 +9,8 @@ trademarks and service marks licensed by Power.org. All other product or
 service names are the property of their respective owners.
 ===============================================================================
 
-Date   : Aug 20, 2013
-Version: 1.0
+Date   : May 5, 2014
+Version: 1.1
 
 ===============================================================================
 
@@ -72,6 +72,7 @@ II. User space code:
          - libmem.so,
          - ipc_test,
          - ipc_test67
+         - l1d_app
 
       2. under dsp_boot directory
          - libdspboot.so
@@ -108,14 +109,19 @@ NOTE: Module params are optional, required only when default setting needs to be
 
 2. insmod /driver/usr/IPC/single_rat/shm.ko
 
-3. Create device nodes with major number flashed while loading kernel modules
-     mknod /dev/fsl_shm c 250 0
-     mknod /dev/het_mgr c 251 0
+3. insmod /driver/usr/IPC/single_rat/l1d.ko
 
-4. Populate shmmax value in proc file system
+4. Create device nodes with major number flashed while loading kernel modules
+     cat /proc/devices will show the major numbers
+
+     mknod /dev/fsl_shm c <major number> 0
+     mknod /dev/het_mgr c <major number> 0
+     mknod /dev/fsl_l1d c <major number> 0
+
+5. Populate shmmax value in proc file system
      echo 0x10000000 > /proc/sys/kernel/shmmax
 
-5. Command to load SDOS image
+6. Command to load SDOS image
 
     Format
     ------
@@ -126,7 +132,7 @@ NOTE: Module params are optional, required only when default setting needs to be
 NOTE: If the semaphore number is specified as 0, it means semaphore is not used.
       Core number specifies the star core number, ranges 0-5.
 
-6. Test applications (ipc_test, ipc_test67) can be started once the DSP/SDOS image
+7. Test applications (ipc_test, ipc_test67) can be started once the DSP/SDOS image
    is loaded successfully with the help of dsp loader(dsp_bt).
 
    Test runs with the help of 6 IPC channels, where for each pair of channels PowerPC is producer
@@ -215,14 +221,19 @@ NOTE: Module params are optional, required only when default setting needs to be
 
 2. insmod /driver/usr/IPC/multi_rat/shm.ko
 
-3. Create device nodes with major number flashed while loading kernel modules
-     mknod /dev/fsl_shm c 250 0
-     mknod /dev/het_mgr c 251 0
+3. insmod /driver/usr/IPC/multi_rat/shm.ko
 
-4. Populate shmmax value in proc file system
+4. Create device nodes with major number flashed while loading kernel modules
+     cat /proc/devices will show the major numbers
+
+     mknod /dev/fsl_shm c <major number> 0
+     mknod /dev/het_mgr c <major number> 0
+     mknod /dev/fsl_l1d c <major number> 0
+
+5. Populate shmmax value in proc file system
      echo 0x10000000 > /proc/sys/kernel/shmmax
 
-5. Command to load SDOS Multi-RAT image
+6. Command to load SDOS Multi-RAT image
 
     Format
     ------
@@ -233,7 +244,7 @@ NOTE: Module params are optional, required only when default setting needs to be
 NOTE: If the semaphore number is specified as 0, it means semaphore is not used.
       Core number specifies the star core number, ranges from 0-5.
 
-6. Test applications (ipc_test, ipc_test67) can be started once the DSP multi rat images
+7. Test applications (ipc_test, ipc_test67) can be started once the DSP multi rat images
    are loaded successfully with the help of dsp loader(dsp_bt),present in rootfs under /ipc.
 
 
@@ -273,6 +284,355 @@ NOTE: ipc_test67 requires a user input,which is the uio interface corresponding
 
 NOTE: If -i option is not provided the test run till eternity.
       If -r option is not provided, it take rat_id as 0.
+
+=======================================================================
+
+l1d Test Application (Single Core only Solutions)
+-------------------------------------------------
+
+1. insmod /usr/driver/IPC/single_rat/hetmgr.ko
+     Following modules params can be passed to override their default
+     values:
+       - dsp_shared_size  (default value 0x1000000)
+       - dsp_private_addr (default value 0x80000000)
+       - dsp_private_size (default value 0x7FF00000)
+       - shared_ctrl_addr (default value 0xFFF00000)
+       - shared_ctrl_size (default value 0x100000)
+       - max_num_ipc_channels (default value 64)
+       - max_channel_depth    (default value 16)
+
+NOTE: Module params are optional, required only when default setting needs to be altered.
+
+2. insmod /usr/driver/IPC/single_rat/shm.ko
+
+3. insmod /usr/driver/IPC/single_rat/l1d.ko
+
+4. Create device nodes with major number flashed while loading kernel modules
+     cat /proc/devices will show the major numbers as well
+
+     mknod /dev/fsl_shm c <major number> 0
+     mknod /dev/het_mgr c <major number> 0
+     mknod /dev/fsl_l1d c <major number> 0
+
+5. Populate shmmax value in proc file system
+     echo 0x10000000 > /proc/sys/kernel/shmmax
+
+6. Command to load SDOS image
+
+    Format
+    ------
+    $./dsp_bt -h <hw_sem> -c <core_id> -i <"image_name"> -s <"shared_image">
+
+    $ ./dsp_bt -h 1 -c 0 -i c0.bin
+
+             Usage: ./dsp_bt -h <hw_sem> -c <core_id> -i <"image_name"> -s <"shared_image">
+             whereas,
+              <hw_sem> : 1 to 7 for use hardware semaphore
+                       : 0 No hardware semaphore used
+              <core_id> : 0 to 5 dsp core number
+              <image_name> : dsp image name
+                         -c option should be followed by -i option
+              <shared_image> : Shared Image name
+
+NOTE: If the semaphore number is specified as 0, it means semaphore is not used.
+      Core number specifies the star core number, ranges 0-5.
+
+7. Test application (l1d_app) can be started once the DSP/SDOS image
+   is loaded successfully with the help of dsp loader(dsp_bt).
+
+   Test sends an ioctl call to the kernel, inside the kernel it waits on a waitqueue,
+   the ioctl returns only if an interrupt is generated by the dsp core towards the PA core via  MPIC interface.
+   This interrupt sets the WSRSR register, value set in this register is returned to the proccss invoking the ioctl
+   and this register is cleared.
+
+   Format
+   ------
+   L1 defense without IPC is use
+   $ ./l1d_app 0 0
+   Usage:
+     ./l1d_app <single core/multi core> <ipc in use>
+   Where as,
+      0: single core
+      1: multi core
+      0: IPC not used
+      1: IPC used
+
+   OR
+   Usage:
+     ./l1d_app
+   Where as,
+     "./l1d_app" means <single core> <ipc not used>
+     Same as "./l1d_app 0 0"
+
+NOTE: This test requires user inputs,which are mentioned below:
+
+     for Eg:
+        Enter your choice
+          0 means not in use for all Parameters
+          Only Values mentioned below are valid, rest all values are invalid
+
+        WARM_RESET_MODE <1 or 2 or 3> Enter value as <0x1, 0x2, 0x4>
+        MAPLE_RESET_MODE <0x0,0x2,0x4,0x8,0x6,0xA,0xC,0xE>
+        Debug_print <0x0,0x1>
+        HW_SEM_NUM <0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>
+        Number of Shared images <0x0,0x1,0x2,0x3,0x4>
+
+        4 0 1 1 0
+
+        Is it B4420 ? <0x0, 0x1>
+        0
+        Run it for infinite loop? (y/n)
+        y
+
+NOTE: SDOS images should be located in /ipc/ directory, with the names as
+      c0.bin, c1.bin, c2.bin, c3.bin, c4.bin, c5.bin.
+      L1d feature can also be used in others MODE-1 and MODE-2
+      Shared images are valid for MODE-3 only.
+
+=======================================================================
+
+l1d Test Application (Multi RAT)
+--------------------------------
+
+0. Since SDOS cannot be reloaded, reboot the system to load multi rat kernel modules.
+
+1. insmod /usr/driver/IPC/multi_rat/hetmgr.ko
+     Following modules params can be passed to override their default
+     values:
+       - dsp_shared_size  (default value 0x1000000)
+       - dsp_private_addr (default value 0x80000000)
+       - dsp_private_size (default value 0x7FF00000)
+       - shared_ctrl_addr (default value 0xFFF00000)
+       - shared_ctrl_size (default value 0x100000)
+       - max_num_ipc_channels (default value 64)
+       - max_channel_depth    (default value 16)
+
+NOTE: Module params are optional, required only when default setting needs to be altered.
+
+2. insmod /usr/driver/IPC/multi_rat/shm.ko
+
+3. insmod /usr/driver/IPC/multi_rat/l1d.ko
+
+4. Create device nodes with major number flashed while loading kernel modules
+     cat /proc/devices will show the major numbers as well
+
+     mknod /dev/fsl_shm c <major number> 0
+     mknod /dev/het_mgr c <major number> 0
+     mknod /dev/fsl_l1d c <major number> 0
+
+5. Populate shmmax value in proc file system
+     echo 0x10000000 > /proc/sys/kernel/shmmax
+
+6. Command to load SDOS image
+
+    Format
+    ------
+    $./dsp_bt -h <hw_sem> -c <core_id> -i <"image_name"> -s <"shared_image">
+
+    $ ./dsp_bt -h 1 -c 1 -i c1.bin -c 0 -i c0.bin -c 2 -i c2.bin -c 3 -i c3.bin -c 4 -i c4.bin -c 5 -i c5.bin -s sh0.bin
+
+             Usage: ./dsp_bt -h <hw_sem> -c <core_id> -i <"image_name"> -s <"shared_image">
+             whereas,
+              <hw_sem> : 1 to 7 for use hardware semaphore
+                       : 0 No hardware semaphore used
+              <core_id> : 0 to 5 dsp core number
+              <image_name> : dsp image name
+                         -c option should be followed by -i option
+              <shared_image> : Shared Image name
+
+NOTE: If the semaphore number is specified as 0, it means semaphore is not used.
+      Core number specifies the star core number, ranges 0-5.
+
+7. Test application (l1d_app) can be started once the DSP/SDOS image
+   is loaded successfully with the help of dsp loader(dsp_bt).
+
+   Test sends an ioctl call to the kernel, inside the kernel it waits on a waitqueue,
+   the ioctl returns only if an interrupt is generated by the dsp core towards the PA core via  MPIC interface.
+   This interrupt sets the WSRSR register, value set in this register is returned to the proccss invoking the ioctl
+   and this register is cleared.
+
+   Format
+   ------
+   L1 defense without IPC is use
+   $ ./l1d_app 1 0
+   Usage:
+     ./l1d_app <single core/multi core> <ipc in use>
+   Where as,
+      0: single core
+      1: multi core
+      0: IPC not used
+      1: IPC used
+
+   OR
+   Usage:
+     ./l1d_app
+   Where as,
+     "./l1d_app" means <single core> <ipc not used>
+     Same as "./l1d_app 0 0"
+
+NOTE: This test requires user inputs,which are mentioned below:
+
+     for Eg:
+        Enter your choice
+          0 means not in use for all Parameters
+          Only Values mentioned below are valid, rest all values are invalid
+
+        WARM_RESET_MODE <1 or 2 or 3> Enter value as <0x1, 0x2, 0x4>
+        MAPLE_RESET_MODE <0x0,0x2,0x4,0x8,0x6,0xA,0xC,0xE>
+        Debug_print <0x0,0x1>
+        HW_SEM_NUM <0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>
+        Number of Shared images <0x0,0x1,0x2,0x3,0x4>
+
+        4 0 1 1 1
+
+        Is it B4420 ? <0x0, 0x1>
+        0
+
+        Run it for infinite loop? (y/n)
+        y
+
+
+NOTE: SDOS images should be located in /ipc/ directory, with the names as
+      c0.bin, c1.bin, c2.bin, c3.bin, c4.bin, c5.bin.
+
+      L1d feature can also be used in others MODE-1 and MODE-2.
+
+      Shared images are valid for MODE-3 only.
+
+=======================================================================
+
+l1d Test Application with IPC used (Multi RAT)
+----------------------------------------------
+
+0. Since SDOS cannot be reloaded, reboot the system to load multi rat kernel modules.
+
+1. insmod /usr/driver/IPC/multi_rat/hetmgr.ko
+     Following modules params can be passed to override their default
+     values:
+       - dsp_shared_size  (default value 0x1000000)
+       - dsp_private_addr (default value 0x80000000)
+       - dsp_private_size (default value 0x7FF00000)
+       - shared_ctrl_addr (default value 0xFFF00000)
+       - shared_ctrl_size (default value 0x100000)
+       - max_num_ipc_channels (default value 64)
+       - max_channel_depth    (default value 16)
+
+NOTE: Module params are optional, required only when default setting needs to be altered.
+
+2. insmod /usr/driver/IPC/multi_rat/shm.ko
+
+3. insmod /usr/driver/IPC/multi_rat/l1d.ko
+
+4. Create device nodes with major number flashed while loading kernel modules
+     cat /proc/devices will show the major numbers as well
+
+     mknod /dev/fsl_shm c <major number> 0
+     mknod /dev/het_mgr c <major number> 0
+     mknod /dev/fsl_l1d c <major number> 0
+
+
+5. Populate shmmax value in proc file system
+     echo 0x10000000 > /proc/sys/kernel/shmmax
+
+6. Command to load SDOS image
+
+    Format
+    ------
+    $./dsp_bt -h <hw_sem> -c <core_id> -i <"image_name"> -s <"shared_image">
+
+    $ ./dsp_bt -h 1 -c 0 -i c0.bin
+
+             Usage: ./dsp_bt -h <hw_sem> -c <core_id> -i <"image_name"> -s <"shared_image">
+             whereas,
+              <hw_sem> : 1 to 7 for use hardware semaphore
+                       : 0 No hardware semaphore used
+              <core_id> : 0 to 5 dsp core number
+              <image_name> : dsp image name
+                         -c option should be followed by -i option
+              <shared_image> : Shared Image name
+
+NOTE: If the semaphore number is specified as 0, it means semaphore is not used.
+      Core number specifies the star core number, ranges 0-5.
+
+7. Run IPC tests:
+         $ ./ipc_test -r 0 -i 10
+         $ ./ipc_test -r 1 -i 10
+         $ ./ipc_test67 -r 0 -i 10
+         $ ./ipc_test67 -r 1 -i 10
+         $ ./ipc_test -r 0 -i 100
+
+NOTE: When total numbers message exchanged is 100 on any channel,
+       DSP generated a watchdog interrupt, after this failures can be seen on IPC channels.
+
+8. Recover DSP cores with the help of test application (l1d_app).
+
+     Test sends an ioctl call to the kernel, inside the kernel it waits on a waitqueue,
+     the ioctl returns only if an interrupt is generated by the dsp core towards the PA core via  MPIC interface.
+     This interrupt sets the WSRSR register, value set in this register is returned to the proccss invoking the ioctl
+     and this register is cleared.
+
+   Format
+   ------
+   L1 defense with IPC is use
+   $ ./l1d_app 1 1
+   Usage:
+     ./l1d_app <single core/multi core> <ipc in use>
+   Where as,
+      0: single core
+      1: multi core
+      0: IPC not used
+      1: IPC used
+
+   OR
+   Usage:
+     ./l1d_app
+   Where as,
+     "./l1d_app" means <single core> <ipc not used>
+     Same as "./l1d_app 0 0"
+
+NOTE: This test requires user inputs,which are mentioned below:
+
+     for Eg:
+        Enter your choice
+          0 means not in use for all Parameters
+          Only Values mentioned below are valid, rest all values are invalid
+
+        WARM_RESET_MODE <1 or 2 or 3> Enter value as <0x1, 0x2, 0x4>
+        MAPLE_RESET_MODE <0x0,0x2,0x4,0x8,0x6,0xA,0xC,0xE>
+        Debug_print <0x0,0x1>
+        HW_SEM_NUM <0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>
+        Number of Shared images <0x0,0x1,0x2,0x3,0x4>
+
+        4 0 1 1 0
+
+        Is it B4420 ? <0x0, 0x1>
+        0
+
+        NR_DSP_CORE <0x2,0x6>
+        2
+        Run it for infinite loop? (y/n)
+        n
+        Number of times you want to run this test?
+        1
+
+        End this test ?(y/n)
+        y
+
+NOTE: SDOS images should be located in /ipc/ directory, with the names as
+      c0.bin, c1.bin, c2.bin, c3.bin, c4.bin, c5.bin.
+
+9. End the l1d_app test with
+
+      End this test ?(y/n)
+      y
+   Or
+      Kill the l1d_app when you see Warm reset success (ctrl+c)
+         == DSP Booted up ==
+         Still at BEGIN_WARM_RESET_OS_INIT or BEGIN_WARM_RESET_APP_INIT sleep 2 sec
+         Warm reset success on core_id = 0x1
+         sleep 5 sec
+
+10. Rerun IPC tests to see that dsp cores are recovered.
 
 =======================================================================
 
