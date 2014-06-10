@@ -1,6 +1,6 @@
 CC=$(CROSS_COMPILE)gcc
 AR=$(CROSS_COMPILE)ar
-CFLAGS=-I ./lib -I ./include -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -Wall
+CFLAGS=-fPIC -I ./lib -I ./include -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -Wall
 
 all: lg_shm_lib lg_shm_test
 lg_shm_lib:

@@ -2,8 +2,8 @@ CC=$(CROSS_COMPILE)gcc
 AR=$(CROSS_COMPILE)ar
 KERNEL_DIR1=$(PWD)/kernel
 HET_DIR=$(KERNEL_DIR1)
-CFLAGS=-Wall -O3 -lpthread -I ./include -I ../fsl_shm/include/ -I ../fsl_shm/lib/ -I ../dsp_boot/ -I $(HET_DIR) -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -Wall
-CFLAGS2=-Wall -I ./include -I ../fsl_shm/lib/  -I ../fsl_shm/include/ -I ../dsp_boot/ -I $(HET_DIR) -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -Wall
+CFLAGS=-fPIC -O3 -lpthread -I ./include -I ../fsl_shm/include/ -I ../fsl_shm/lib/ -I ../dsp_boot/ -I $(HET_DIR) -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -Wall
+CFLAGS2=-fPIC -I ./include -I ../fsl_shm/lib/  -I ../fsl_shm/include/ -I ../dsp_boot/ -I $(HET_DIR) -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -Wall
 
 ifeq ($(CONFIG_LOCK), 1)
 	CFLAGS+=-DCONFIG_LOCK
