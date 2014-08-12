@@ -40,7 +40,28 @@
 #define DCSR_CNPC_OQCR_OFFSET       0x0C
 #define DCSR_CNPC_OQCR_AFA_MASK     0x00000010
 /* End vtb flush*/
+/* HW WATCHPOINT
+ * DCSR base depends upon the corresponding LAW
+ */
+#define DCSR_BASE 0xF00000000
+#define DCSR_CLUSTER0_OFFSET 0x110000
+#define DCSR_CLUSTER_OFFSET 0x10000
+#define CORE_OFFSET 0x8000
+#define DTU_OFFSET 0x4000
 
+#define DHRRR_OFFSET 0xA0
+#define DMEER_OFFSET 0x70
+#define ARDCR0_OFFSET 0x250
+#define DEPCR0_OFFSET 0x254
+#define PADRRA0_OFFSET 0x258
+#define PADRRB0_OFFSET 0x25C
+
+#define WPT_TYPE_W 0x40001
+#define WPT_TYPE_R 0x20001
+#define WPT_TYPE_WR 0x60001
+#define WPT_REGS_SIZE 0x1000
+
+/* END HW WATCHPOINT */
 #define OS_HET_SC_SEMAPHORE_VAL         0xFE
 #endif
 

@@ -1339,6 +1339,88 @@ void flush_cnpc()
 	return;
 }
 
+int set_Hw_watchpoint(dsp_core_info *DspCoreInfo, void *dsp_bt)
+{
+	printf("Set Hw_watchpoint \n");
+
+	volatile void *dtu_offset_vaddr = NULL;
+	uint64_t temp = 0;
+	int mem_fd = ((dsp_bt_t *)dsp_bt)->dev_mem;
+	int i = 0;
+	uint16_t clusterIndex = 0;
+	uint16_t coreInCluster = 0;
+	uint64_t dcsrDtuAddress = DCSR_BASE + DCSR_CLUSTER0_OFFSET;
+
+	while (i < NR_DSP_CORE) {
+		if ((DspCoreInfo->reDspCoreInfo[i].reset_core_flag) &&
+		   ((DspCoreInfo->reDspCoreInfo[i].wpt_type == 'b')
+		     || (DspCoreInfo->reDspCoreInfo[i].wpt_type == 'w')
+		     || (DspCoreInfo->reDspCoreInfo[i].wpt_type == 'r'))) {
+
+			clusterIndex = i / 2;
+			coreInCluster = i % 2;
+			temp = 0;
+			temp = (clusterIndex + 1) * DCSR_CLUSTER_OFFSET +
+				coreInCluster * CORE_OFFSET + DTU_OFFSET;
+
+			dtu_offset_vaddr = mmap(NULL, WPT_REGS_SIZE,
+					   (PROT_READ | PROT_WRITE),
+					   MAP_SHARED, mem_fd,
+					   (dcsrDtuAddress + temp));
+			if (dtu_offset_vaddr == MAP_FAILED) {
+				printf("error in mmap dcsrDtuAddress"
+					" frm %s\n", __func__);
+				return -1;
+			}
+
+			/* *regDHRRR */
+			*((uint32_t *)(dtu_offset_vaddr + DHRRR_OFFSET)) =
+				0x100;
+			asm("lwsync");
+			/* *regDMEER */
+			*((uint32_t *)(dtu_offset_vaddr + DMEER_OFFSET)) =
+				0x100;
+			asm("lwsync");
+
+			l1d_printf("CoreId=%d dhrrr=%#x dmeer=%#x\n", i,
+			   *((uint32_t *)(dtu_offset_vaddr + DHRRR_OFFSET)),
+			   *((uint32_t *)(dtu_offset_vaddr + DMEER_OFFSET)));
+
+			/* *regARDCR0 */
+			if (DspCoreInfo->reDspCoreInfo[i].wpt_type == 'b')
+				*((uint32_t *)(dtu_offset_vaddr +\
+				 ARDCR0_OFFSET)) = WPT_TYPE_WR;
+			else if (DspCoreInfo->reDspCoreInfo[i].wpt_type == 'w')
+				*((uint32_t *)(dtu_offset_vaddr +\
+				ARDCR0_OFFSET)) = WPT_TYPE_W;
+			else  /* read */
+				*((uint32_t *)(dtu_offset_vaddr +\
+				ARDCR0_OFFSET)) = WPT_TYPE_R;
+			asm("lwsync");
+
+			/* *regPADRRA0 */
+			*((uint32_t *)(dtu_offset_vaddr + PADRRA0_OFFSET)) =
+				DspCoreInfo->reDspCoreInfo[i].wpt_begin_addr;
+			asm("lwsync");
+			/* *regPADRRB0 */
+			*((uint32_t *)(dtu_offset_vaddr + PADRRB0_OFFSET)) =
+				DspCoreInfo->reDspCoreInfo[i].wpt_end_addr;
+			asm("lwsync");
+
+			l1d_printf("CoreID = %d: DHRRR p=%#llx v=%p\n", i,
+				dcsrDtuAddress+temp+DHRRR_OFFSET,
+				dtu_offset_vaddr+DHRRR_OFFSET);
+			l1d_printf("CoreId = %d: ARDCR0 p=%#llx v=%p\n", i,
+				dcsrDtuAddress+temp+ARDCR0_OFFSET,
+				dtu_offset_vaddr+ARDCR0_OFFSET);
+
+			munmap((void *)dtu_offset_vaddr, WPT_REGS_SIZE);
+			}
+		i++;
+	}
+
+	return 0;
+}
 
 int pre_load_B4(int count, ...)
 {
@@ -1720,6 +1802,15 @@ int fsl_start_L1_defense(fsl_ipc_t ipc, dsp_core_info *DspCoreInfo)
 		printf("Error in check_dsp_ready_CRSTSR_B4 frm %s\n", __func__);
 		goto end_L1_defense;
 	}
+
+	/*
+	 * Set Hw Watchpoint
+	 */
+	if (DspCoreInfo->cfg_wpt == 1)
+		if (set_Hw_watchpoint(DspCoreInfo, dsp_bt) < 0) {
+			printf("Error in set_Hw_watchpoint frm %s\n", __func__);
+			return -1;
+		}
 
 	if (DspCoreInfo->reset_mode == MODE_3_ACTIVE ||
 	    DspCoreInfo->reset_mode == MODE_2_ACTIVE) {

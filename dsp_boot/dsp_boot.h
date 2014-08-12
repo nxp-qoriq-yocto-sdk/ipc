@@ -73,6 +73,9 @@ typedef struct{
 	int reset_core_flag;
 	int core_id;
 	char *dsp_filename;
+	uint32_t wpt_begin_addr;
+	uint32_t wpt_end_addr;
+	char wpt_type;
 } reload_dsp_core_info;
 
 typedef struct{
@@ -80,6 +83,7 @@ typedef struct{
 	int reset_mode;
 	int maple_reset_mode;
 	int debug_print;
+	int cfg_wpt;
 	reload_dsp_core_info shDspCoreInfo[6];
 	reload_dsp_core_info reDspCoreInfo[6];
 } dsp_core_info;

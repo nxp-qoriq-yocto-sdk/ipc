@@ -50,6 +50,73 @@ static void usage(char arg[30])
 
 static void test_init(int rat_id);
 
+static void add_watchpoint()
+{
+	char wpt_t;
+	uint32_t cfg_wpt = 0;
+	uint32_t wpt_ID = 0;
+	uint32_t wpt_b = 0;
+	uint32_t wpt_e = 0;
+	char *s;
+	char line[256] = {0};
+
+	DspCoreInfo->cfg_wpt = 0;
+
+	puts("\nconfigure watchpoint ? (0/1)");
+	scanf("%d", &cfg_wpt);
+	/* Set cfg_wpt here */
+	DspCoreInfo->cfg_wpt = cfg_wpt;
+
+	if (cfg_wpt != 0)
+		puts("Core ID (0-5), Begin_address (32-bit),"
+		     " End address (32-bit), type(w/r/b)\n");
+
+	while (cfg_wpt != 0) {
+
+		s = fgets(line, sizeof(line), stdin);
+		if (*s == '\n' || s == NULL || *s == '\r')
+			continue;
+
+		/* Space to accommodate 0x */
+		sscanf(line, "%d"" %x"" %x"" %c", &wpt_ID,
+						  &wpt_b,
+						  &wpt_e,
+						  &wpt_t);
+		if (wpt_ID > 5 || wpt_ID < 0) {
+			puts("Incorrect core ID");
+			goto Input_err;
+		} else if (wpt_b == 0x0 || wpt_e == 0x0) {
+			puts("Incorrect Begin/End address");
+			goto Input_err;
+		} else if (!(wpt_t == 'r' || wpt_t == 'b' || wpt_t == 'w')) {
+			puts("Incorrect Address type");
+			goto Input_err;
+		} else
+			goto Proceed;
+
+Input_err:
+			puts("Try again:");
+			puts("Core ID (0-5), Begin_address (32-bit),"
+				" End address (32-bit), type(w/r/b)\n");
+			continue;
+
+Proceed:
+		DspCoreInfo->reDspCoreInfo[wpt_ID].wpt_begin_addr = wpt_b;
+		DspCoreInfo->reDspCoreInfo[wpt_ID].wpt_end_addr = wpt_e;
+		DspCoreInfo->reDspCoreInfo[wpt_ID].wpt_type = wpt_t;
+
+		puts("Add More watchpoint ? (0/1)");
+		/* \n is taken as input so add space */
+		scanf("%d", &cfg_wpt);
+		if (cfg_wpt != 0)
+			puts("Core ID (0-5), Begin_address (32-bit),"
+			     " End address (32-bit), type(w/r/b)\n");
+	}
+
+	return;
+
+}
+
 void l1d_callback(uint32_t core_mask1)
 {
 	int i;
@@ -85,6 +152,9 @@ void l1d_callback(uint32_t core_mask1)
 		DspCoreInfo->reset_mode = warm_reset_mode;
 		DspCoreInfo->maple_reset_mode = maple_reset_mode;
 		DspCoreInfo->debug_print = debug_print;
+
+		/* Add watchPoint */
+		add_watchpoint();
 	}
 
 	for (i = 0; i < nr_dsp_core; i++) {
@@ -272,6 +342,9 @@ void test_init(int rat_id)
 					(shared_image_name[i]);
 		DspCoreInfo->shDspCoreInfo[i].core_id = -1;
 	}
+
+	/* Add watchPoint */
+	add_watchpoint();
 
 	puts("\nRun it for infinite loop? (y/n)");
 	/* \n is taken as input so add space */
