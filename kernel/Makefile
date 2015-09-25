@@ -25,7 +25,7 @@ ifeq ($(B4860), 1)
     ccflags-y += -DB4860
 endif
 
-include $(KERNEL_DIR)/.config
+include $(KBUILD_OUTPUT)/.config
 
 ifneq ($(CONFIG_SYS_SUPPORTS_HUGETLBFS),y)
      fatal := $(error HUGETLB is Disabled in Kernel. fsl_shm depends on it)
