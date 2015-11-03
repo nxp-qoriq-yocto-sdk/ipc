@@ -41,6 +41,8 @@
 
 #ifdef B4860
 #define B4860QDS_MODEL_STR	"fsl,B4860QDS"
+#define BSTAR_VAL 0x8000000C
+#define DDRC_TRG_ID(val) (BSTAR_VAL | (val << 20))
 static int DCFG_BRR_mask;
 static int GIC_VIGR_VALUE;
 static int GIC_VIGR_VALUE_ARR[6] = {0x302, 0x303, 0x304, 0x305, 0x306, 0x307};
@@ -1015,7 +1017,7 @@ static int release_starcore_B4(void *dsp_bt)
 	asm("lwsync");
 	*(vaddr + LCC_BSTRL) =  (intvec_addr & U32_T_MASK);
 	asm("lwsync");
-	*(vaddr + LCC_BSTAR) =  0x8100000C;
+	*(vaddr + LCC_BSTAR) =  DDRC_TRG_ID(((dsp_bt_t *)dsp_bt)->DDRC_trg_id);
 	asm("lwsync");
 	*(vaddr + GCR_CDCER0) =  0x000003f0;
 	asm("lwsync");
@@ -2133,7 +2135,7 @@ int b4860_load_dsp_image(int argc, dspbt_core_info CoreInfo[])
 #endif
 
 	/* release StarCore */
-
+	((dsp_bt_t *)dsp_bt)->DDRC_trg_id = CoreInfo[0].DDRC_trg_id;
 	if (release_starcore_B4(dsp_bt)) {
 		printf("Error in releasing StarCore\n");
 		goto end_b4860_load_dsp_image;

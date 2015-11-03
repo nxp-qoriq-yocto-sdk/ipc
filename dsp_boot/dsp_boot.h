@@ -64,6 +64,7 @@ typedef struct{
 	uint64_t intvec_addr;
 	uint32_t core_id;
 	uint32_t semaphore_num;
+	uint32_t DDRC_trg_id;
 
 	int (*pre_load)(int, ...);
 	int (*load_image)(char *, void *);
@@ -72,6 +73,7 @@ typedef struct{
 
 typedef struct{
 	int core_id;
+	uint32_t DDRC_trg_id;
 	char *image_name;
 } dspbt_core_info;
 
@@ -110,5 +112,5 @@ int check_validation_fields(void *);
 #define DSP_BOOT_SUCCESS 2
 #define ERR_L1_DEFENSE_API_FAIL 30
 #define SIZE_1MB 0x10000
-
+#define DDRC1_TRG_ID 0x10
 #endif

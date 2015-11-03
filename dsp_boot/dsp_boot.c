@@ -45,19 +45,21 @@
 #if B913x
 #define VERSION 	"2.0.0"
 #else
-#define VERSION 	"3.0.0"
-#define CMD_LINE_OPT "i:c:s:h:"
+#define VERSION 	"3.1.0"
+#define CMD_LINE_OPT "i:c:s:h:d:"
 #define HW_SEM "hw_sem"
 
 void usage(char **argv)
 {
 	printf("Usage: %s -h <hw_sem> -c <core_id> -i <\"image_name\">"
+		" -d <\"DDR Controller ID\">"
 		" -s <\"shared_image\">\n",	argv[0]);
 	printf("whereas,\n <hw_sem> : 1 to 7 for use hardware semaphore\n"
 		"          : 0 No hardware semaphore used\n"
 		" <core_id> : 0 to 5 dsp core number \n"
 		" <image_name> : dsp image name\n"
 		" 		 -c option should be followed by -i option\n"
+		" <DDR Controller ID> : 0x10, 0x11, is an optional parameter \n"
 		" <shared_image> : Shared Image name \n");
 	exit(EXIT_FAILURE);
 }
@@ -103,8 +105,10 @@ int main(int argc, char *argv[])
 	dspbt_core_info *CoreInfo;
 	CoreInfo = malloc(20*sizeof(dspbt_core_info));
 	int i = 1, cnt_c = 0, cnt_i = 0, k = 0;
+	char *endptr;
 
 	CoreInfo[0].core_id = 0;
+	CoreInfo[0].DDRC_trg_id = DDRC1_TRG_ID;
 	CoreInfo[0].image_name = malloc(200);
 	memcpy(CoreInfo[0].image_name, HW_SEM, sizeof(HW_SEM));
 
@@ -131,6 +135,28 @@ int main(int argc, char *argv[])
 			((CoreInfo + i)->image_name) = malloc(500);
 			memcpy(CoreInfo[i].image_name, optarg, strlen(optarg));
 			i++;
+			break;
+		case 'd':
+			errno = 0;
+			CoreInfo[0].DDRC_trg_id = strtoul(optarg, &endptr, 16);
+
+			if (errno != 0) {
+				perror("strtol");
+				goto err;
+			}
+			if (endptr == optarg) {
+				printf("No digits were found\n");
+				goto err;
+			}
+			if (*endptr != '\0') {
+				printf("Further characters after number\n");
+				goto err;
+			}
+			break;
+err:
+			printf("Setting default DDRC target ID\n");
+			CoreInfo[0].DDRC_trg_id = DDRC1_TRG_ID;
+			printf("DDRC Trg ID=%#x\n", CoreInfo[0].DDRC_trg_id);
 			break;
 		case 'h':
 			if (isdigit(optarg[0])) {
