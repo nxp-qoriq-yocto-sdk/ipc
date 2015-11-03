@@ -49,11 +49,5 @@
 #define DUMPR(R) ;
 #endif
 
-#ifdef DEBUG_RELOAD
-#define reload_print(...)  printf(__VA_ARGS__);
-#else
-#define reload_print(...)
-#endif
-
 
 #endif

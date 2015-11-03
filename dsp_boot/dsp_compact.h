@@ -29,11 +29,23 @@
 #define PCPH15CLRR (0xE20B8/4)
 #define PIR (0x41090/4)
 #define DCFG_CRSTSR	(0xE0410/4)
+
 #define L2_CACHE_2	(0xC60000/4)
 #define L2_CACHE_3	(0xCA0000/4)
 #define L2_CACHE_4	(0xCE0000/4)
-#define L2_CACHE_INVALIDATE_MASK (1 << 21)
-#define L2_CACHE_FLUSH (1 << 11)
+#define OFF_L2_CACHE_X (0x40000/4)
+#define OFF_L2_CACHE_X_CSR1 (0x4/4)
+/* L2_CACHE_LOCK_FLASH_CLEAR_MASK */
+#define L2LFC (1 << 10)
+/* L2_CACHE_INVALIDATE_MASK */
+#define L2FI (1 << 21)
+/* L2_CACHE_FLUSH */
+#define L2FL (1 << 11)
+/* L2_CACHE_ENABLE */
+#define L2E (1 << 31)
+/* L2_CACHE_PARITY_ENABLE*/
+#define L2PE (1 << 30)
+
 #define NR_DSP_CORE	6
 /* VTB flush*/
 #define CNPC_PHYSICAL_ADDR          0xF00001000

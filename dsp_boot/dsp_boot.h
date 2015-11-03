@@ -38,6 +38,12 @@
 #define reload_print(...)
 #endif
 
+#ifdef DEBUG_L2I
+#define L2I_printf(...)  printf(__VA_ARGS__);
+#else
+#define L2I_printf(...)
+#endif
+
 #ifdef DEBUG_L1D
 #define l1d_printf(...)	printf(__VA_ARGS__);
 #else
@@ -95,6 +101,7 @@ int fsl_B4_ipc_init(void *);
 int fsl_913x_ipc_init(void *);
 int b913x_load_dsp_image(char *);
 int b4860_load_dsp_image(int , dspbt_core_info []);
+int dsp_cluster_count_f(dspbt_core_info CI);
 int fsl_restart_L1(fsl_ipc_t, char*);
 int fsl_start_L1_defense(fsl_ipc_t , dsp_core_info *);
 int fsl_B4_ipc_reinit(fsl_ipc_t , void *);

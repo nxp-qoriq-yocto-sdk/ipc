@@ -518,7 +518,6 @@ static int load_dsp_image(char *fname, void *dsp_bt)
 			       (long long unsigned int)size);
 		ret = copy_file_part(vaddr, size, dspbin);
 		unmap_area(vaddr, tsize);
-		ret = 0;
 
 		reload_print("%s: ret =%d\n", __func__, ret);
 
@@ -1118,19 +1117,19 @@ static int dsp_L2_cache_invalidate_B4(dsp_core_info *DspCoreInfo, void *dsp_bt)
 
 	l1d_printf("%s: before L2_CACHE_2=0x%x\n", __func__,
 			*(vaddr + L2_CACHE_2));
-	l1d_printf("L2_CACHE_INVALIDATE_MASK %x\n", L2_CACHE_INVALIDATE_MASK);
-	l1d_printf("L2_CACHE_FLUSH_MASK %x\n", L2_CACHE_FLUSH);
+	l1d_printf("L2_CACHE_INVALIDATE_MASK %x\n", L2FI);
+	l1d_printf("L2_CACHE_FLUSH_MASK %x\n", L2FL);
 
 	if (DspCoreInfo->reset_mode == MODE_3_ACTIVE) {
-		*(vaddr + L2_CACHE_2) |= L2_CACHE_INVALIDATE_MASK;
+		*(vaddr + L2_CACHE_2) |= L2FI;
 		asm("lwsync");
 
 		puts("L2 cache cluster2 invalidated");
 
 		if (!memcmp(model_str, B4860QDS_MODEL_STR, bytes)) {
-			*(vaddr + L2_CACHE_3) |= L2_CACHE_INVALIDATE_MASK;
+			*(vaddr + L2_CACHE_3) |= L2FI;
 			asm("lwsync");
-			*(vaddr + L2_CACHE_4) |= L2_CACHE_INVALIDATE_MASK;
+			*(vaddr + L2_CACHE_4) |= L2FI;
 			asm("lwsync");
 			puts("L2 cache cluster3&4 invalidated");
 		}
@@ -1148,6 +1147,80 @@ static int dsp_L2_cache_invalidate_B4(dsp_core_info *DspCoreInfo, void *dsp_bt)
 
 	unmap_area((void *)vaddr, size);
 end_L2_INVALIDATE:
+
+	return ret;
+}
+
+static int dsp_L2_cache_init_B4(void *dsp_bt, int dsp_cluster_count)
+{
+	L2I_printf("enter func %s %d\n", __func__, dsp_cluster_count);
+
+	sys_map_t *het_sys_map = &((dsp_bt_t *)dsp_bt)->het_sys_map;
+	uint64_t size = het_sys_map->pa_ccsrbar.size;
+	volatile uint32_t *vaddr = NULL;
+	int ret = 0, i = 0;
+
+	/*map to this value phys_addr = 0xffe000000*/
+	uint64_t phys_addr = het_sys_map->pa_ccsrbar.phys_addr;
+
+	vaddr = map_area64(phys_addr, &size, dsp_bt);
+	if (!vaddr) {
+		printf("\nError in mapping physical address %llx to virtual"
+		       "address from func %s\n",
+		       (long long unsigned int)phys_addr, __func__);
+		return -1;
+	}
+
+	while (dsp_cluster_count > 0) {
+
+		if ((*(vaddr + L2_CACHE_2 + i * OFF_L2_CACHE_X) & L2E)) {
+			printf("DSP L2 cache Cluster_%d already enabled\n",
+				(2 + i));
+			i++;
+			dsp_cluster_count -= 1;
+			continue;
+		}
+		L2I_printf("%s: Begin L2_CACHE_%d=0x%x\n", __func__, (2 + i),
+			*(vaddr + L2_CACHE_2 + i * OFF_L2_CACHE_X));
+
+
+		*(vaddr + L2_CACHE_2 + i * OFF_L2_CACHE_X) = L2FI | L2LFC;
+		asm("lwsync");
+		while ((*(vaddr + L2_CACHE_2 + i * OFF_L2_CACHE_X) &
+			(L2FI|L2LFC))) {
+				printf("Waiting for FI\n");
+				L2I_printf("%s: before L2_CACHE_%d=0x%x\n",
+						__func__, (2 + i),
+				*(vaddr + L2_CACHE_2 + i * OFF_L2_CACHE_X));
+			}
+
+		L2I_printf("%s: After L2_CACHE_%d=0x%x\n", __func__, (2 + i),
+			*(vaddr + L2_CACHE_2 + i * OFF_L2_CACHE_X));
+		printf("L2 cache cluster%d init\n", (2+i));
+		L2I_printf("vaddr %p\n", vaddr);
+
+		L2I_printf("p1 = %p\n", (vaddr + L2_CACHE_2 +
+				(i * OFF_L2_CACHE_X) + OFF_L2_CACHE_X_CSR1));
+		*(vaddr + L2_CACHE_2 + (i * OFF_L2_CACHE_X) +
+				OFF_L2_CACHE_X_CSR1) = (34 + (i * 2) + 1);
+		asm("lwsync");
+
+		*(vaddr + L2_CACHE_2 + (i * OFF_L2_CACHE_X)) = L2E | L2PE;
+		asm("lwsync");
+
+		L2I_printf("L2E p=%p %#x\n",
+			(vaddr + L2_CACHE_2 + (i * OFF_L2_CACHE_X)),
+			*(vaddr + L2_CACHE_2 + (i * OFF_L2_CACHE_X)));
+		while (!(*(vaddr + L2_CACHE_2 + i * OFF_L2_CACHE_X) & L2E))
+				printf("Waiting for L2E\n");
+
+		L2I_printf("%s: After L2_CACHE_%d=0x%x\n",  __func__, (2 + i),
+			*(vaddr + L2_CACHE_2 + (i * OFF_L2_CACHE_X)));
+
+		dsp_cluster_count -= 1;
+		i++;
+	}
+	unmap_area((void *)vaddr, size);
 
 	return ret;
 }
@@ -1472,6 +1545,7 @@ int pre_load_B4(int count, ...)
 	va_list arg_b;
 	va_start(arg_b, count);
 	void *dsp_bt = va_arg(arg_b, void*);
+	int dspClusterCount = va_arg(arg_b, int);
 
 	((dsp_bt_t *)dsp_bt)->het_mgr = init_hetmgr();
 	if (((dsp_bt_t *)dsp_bt)->het_mgr == -1) {
@@ -1514,6 +1588,11 @@ int pre_load_B4(int count, ...)
 
 	if (fsl_B4_ipc_init(dsp_bt)) {
 		printf("error in fsl_B4_ipc_init frm %s\n", __func__);
+		return -1;
+	}
+
+	if (dsp_L2_cache_init_B4(dsp_bt, dspClusterCount)) {
+		printf("error in dsp_L2_cache_init frm %s\n", __func__);
 		return -1;
 	}
 
@@ -1706,10 +1785,19 @@ int post_load_B4(void *dsp_bt)
 	return check_dsp_boot_B4(dsp_bt);
 }
 
+int dsp_cluster_count_f(dspbt_core_info CI)
+{
+	return CI.core_id/2 + 1;
+}
+
 int b4860_load_dsp_image(int argc, dspbt_core_info CoreInfo[])
 {
 
 	int i = 0;
+	/* argc -1 since array starts from 0 */
+	int dspClusterCount = dsp_cluster_count_f(CoreInfo[(argc - 1)]);
+	L2I_printf("dspClusterCount=%d\n", dspClusterCount);
+
 	void *dsp_bt;
 	dsp_bt = (void *)malloc(sizeof(dsp_bt_t));
 
@@ -1724,7 +1812,7 @@ int b4860_load_dsp_image(int argc, dspbt_core_info CoreInfo[])
 
 
 	/* Call func Pointers*/
-	if (((dsp_bt_t *)dsp_bt)->pre_load(1, dsp_bt) < 0)
+	if (((dsp_bt_t *)dsp_bt)->pre_load(2, dsp_bt, dspClusterCount) < 0)
 		goto end_b4860_load_dsp_image;
 
 	/* Load image StarCore */

@@ -156,6 +156,7 @@ int main(int argc, char *argv[])
 		for (k = 0; k < i; k++)
 			l1d_printf("i=%i id=%i name=%s \n", i,
 				CoreInfo[k].core_id, CoreInfo[k].image_name);
+		/* End of Core specific images marked with -1 core ID */
 		b4860_load_dsp_image(i, CoreInfo);
 	}
 #endif
