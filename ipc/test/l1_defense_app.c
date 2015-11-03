@@ -16,6 +16,7 @@
 #include "fsl_bsc913x_ipc.h"
 #include "fsl_ipc_errorcodes.h"
 #include "fsl_heterogeneous_l1_defense.h"
+#include "dsp_compact.h"
 #define DSP_IMAGE_NAME "/dsp_images/vnmi15_9132_recovery_dbg.bin"
 #define UIO_INTERFACE   "/dev/uio0"
 
@@ -117,6 +118,49 @@ Proceed:
 
 }
 
+static void add_dsp_safe_addr()
+{
+	uint32_t cfg_dsa = 0;
+	uint32_t dsa_ID = 0;
+	uint32_t dsa_v = 0;
+	char *s;
+	char line[256] = {0};
+
+	puts("\nUse Default DSP safe virtual address ? (0/1)");
+	scanf("%d", &cfg_dsa);
+
+	if (cfg_dsa == 0)
+		puts("Core ID (0-5), DSP safe virtual address (32-bit),");
+
+	while (cfg_dsa == 0) {
+
+		s = fgets(line, sizeof(line), stdin);
+		if (*s == '\n' || s == NULL || *s == '\r')
+			continue;
+
+		/* Space to accommodate 0x */
+		sscanf(line, "%d"" %x", &dsa_ID,
+					&dsa_v);
+		if (dsa_ID > 5 || dsa_ID < 0)
+			printf("WARNING!!! core id is=%d\n", dsa_ID);
+		else if (dsa_v == 0x0)
+			printf("WARNING!!! dsp safe adddress is=%#x\n", dsa_v);
+		else
+			DspCoreInfo->reDspCoreInfo[dsa_ID].dsp_safe_addr =
+				dsa_v;
+
+		printf("Use Default DSP safe virtual address for other cores"
+				" ? (0/1)\n");
+		/* \n is taken as input so add space */
+		scanf("%d", &cfg_dsa);
+		if (cfg_dsa == 0)
+			puts("Core ID (0-5), DSP safe virtual address"
+				" (32-bit),");
+	}
+
+	return;
+}
+
 void l1d_callback(uint32_t core_mask1)
 {
 	int i;
@@ -155,6 +199,17 @@ void l1d_callback(uint32_t core_mask1)
 
 		/* Add watchPoint */
 		add_watchpoint();
+		for (i = 0; i < nr_dsp_core; i++) {
+			DspCoreInfo->reDspCoreInfo[i].dsp_safe_addr =
+				DSP_SAFE_ADDR;
+		}
+		add_dsp_safe_addr();
+		printf("\nDSP safe virtual address used are:\n");
+		for (i = 0; i < nr_dsp_core; i++) {
+			printf("%#x  ",
+				DspCoreInfo->reDspCoreInfo[i].dsp_safe_addr);
+		}
+		printf("\n");
 	}
 
 	for (i = 0; i < nr_dsp_core; i++) {
@@ -345,6 +400,16 @@ void test_init(int rat_id)
 
 	/* Add watchPoint */
 	add_watchpoint();
+
+	for (i = 0; i < nr_dsp_core; i++)
+		DspCoreInfo->reDspCoreInfo[i].dsp_safe_addr = DSP_SAFE_ADDR;
+
+	add_dsp_safe_addr();
+	printf("\nDSP safe virtual address used are:\n");
+	for (i = 0; i < nr_dsp_core; i++)
+		printf("%#x  ",	DspCoreInfo->reDspCoreInfo[i].dsp_safe_addr);
+
+	printf("\n");
 
 	puts("\nRun it for infinite loop? (y/n)");
 	/* \n is taken as input so add space */

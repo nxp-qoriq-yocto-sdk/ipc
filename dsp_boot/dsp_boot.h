@@ -82,6 +82,7 @@ typedef struct{
 	uint32_t wpt_begin_addr;
 	uint32_t wpt_end_addr;
 	char wpt_type;
+	uint32_t dsp_safe_addr;
 } reload_dsp_core_info;
 
 typedef struct{
@@ -90,8 +91,8 @@ typedef struct{
 	int maple_reset_mode;
 	int debug_print;
 	int cfg_wpt;
-	reload_dsp_core_info shDspCoreInfo[6];
-	reload_dsp_core_info reDspCoreInfo[6];
+	reload_dsp_core_info shDspCoreInfo[12];
+	reload_dsp_core_info reDspCoreInfo[12];
 } dsp_core_info;
 
 

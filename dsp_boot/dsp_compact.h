@@ -76,6 +76,20 @@
 
 /* END HW WATCHPOINT */
 #define OS_HET_SC_SEMAPHORE_VAL         0xFE
+
+/*
+ * DSP safe address is DTU PC_NEXT
+ * DCSR base host DTU
+ */
+#define DSP_SAFE_ADDR 0x80000000
+#define PC_NEXT_OFFSET 0x50
+#define RCR_OFFSET 0x54
+#define SASR_OFFSET 0x120
+#define SASR_DM_MASK 0x00000008
+#define RCR_VALUE 001
+#define RCPM_OFFSET 0x22000
+#define CRSMCR0_OFFSET 0x5C
+/* END DTU RESUME ADDR */
 #endif
 
 #ifdef B913x

@@ -12,6 +12,10 @@ endif
 ifeq ($(B4860), 1)
   CFLAGS2+=-DB4860
   CFLAGS+=-DB4860
+ifeq ($(PROD_REL), 1)
+  CFLAGS2+=-DPRODUCTION_REL
+  CFLAGS+=-DPRODUCTION_REL
+endif
 endif
 
 ifeq ($(B913x), 1)
