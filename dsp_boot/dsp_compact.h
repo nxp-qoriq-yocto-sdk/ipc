@@ -12,6 +12,7 @@
 #ifdef B4860
 #define ADDR_SIZE 8
 #define MAP_AREA_MASK 0xfffffffffffff000
+#define U32_T_MASK 0xFFFFFFFF
 #define VIR_ADDR32_MASK 0xfffff000
 
 #define LCC_BSTRH 0x8

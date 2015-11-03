@@ -17,7 +17,7 @@
 #include <signal.h>
 #include <string.h>
 #include <stdarg.h>
-#include <stdio.h>
+
 #include <stdint.h>
 #include <time.h>
 #include "fsl_het_mgr.h"
@@ -411,6 +411,7 @@ static int load_dsp_image(char *fname, void *dsp_bt)
 	void *vaddr;
 	int ret = 0;
 	uint64_t tsize = 0, size;
+	uint32_t reg_val32 = 0;
 	dspbin = fopen(fname, "rb");
 	if (!dspbin) {
 		printf("%s File not found, exiting", fname);
@@ -457,6 +458,49 @@ static int load_dsp_image(char *fname, void *dsp_bt)
 			}
 			continue;
 		}
+#ifdef B4860
+		/* Read the dsp MMU addr and store in dsp_mmu_reg
+		 * Bitwise add with ccsbar 0xFFE000000 to verify the same
+		 */
+		if ((addr &
+		     ((dsp_bt_t *)dsp_bt)->het_sys_map.pa_ccsrbar.phys_addr) ==
+		     ((dsp_bt_t *)dsp_bt)->het_sys_map.pa_ccsrbar.phys_addr) {
+
+			/* Values written in CCSR space should have
+			   non-cacheable attribute
+			 * It should have peripheral attribute
+			 */
+			vaddr = map_area64(addr, &tsize, dsp_bt);
+			if (!vaddr) {
+				ret = -1;
+				printf("\n Error in mapping physical address"
+				" %llx to virtual address in %s\n",
+				(long long unsigned int)addr, __func__);
+				goto end_close_file;
+			}
+
+			ret = fread(&reg_val32, size, 1, dspbin);
+			if (!ret) {
+				if (ferror(dspbin))
+					printf("%s: File read error - %d\n",
+				       fname, errno);
+				unmap_area(vaddr, tsize);
+				break;
+			} else {
+				*((uint32_t *)vaddr) = reg_val32;
+				asm("lwsync");
+				l1d_printf("\n\nDSP MMU addr=%#llx in %s"
+					" reg_val32=%#x\n",
+					addr, fname, reg_val32);
+				l1d_printf("Read back DSP MMU addr=%#llx in %s"
+					" reg_val32=%#x\n",
+					addr, fname, *((uint32_t *)vaddr));
+				unmap_area(vaddr, tsize);
+				continue;
+			}
+		}
+#endif
+
 #ifdef B913x
 			vaddr = map_area64(addr, &tsize, dsp_bt);
 #endif
@@ -472,9 +516,9 @@ static int load_dsp_image(char *fname, void *dsp_bt)
 		}
 		printf("\n Copy Part %llx %llx\n", (long long unsigned int)addr,
 			       (long long unsigned int)size);
-			ret = copy_file_part(vaddr, size, dspbin);
-			unmap_area(vaddr, tsize);
-			ret = 0;
+		ret = copy_file_part(vaddr, size, dspbin);
+		unmap_area(vaddr, tsize);
+		ret = 0;
 
 		reload_print("%s: ret =%d\n", __func__, ret);
 
@@ -921,7 +965,7 @@ end_fsl_restart_L1:
 #ifdef B4860
 static int release_starcore_B4(void *dsp_bt)
 {
-	uint32_t intvec_addr = ((dsp_bt_t *)dsp_bt)->intvec_addr;
+	uint64_t intvec_addr = ((dsp_bt_t *)dsp_bt)->intvec_addr;
 	sys_map_t *het_sys_map = &((dsp_bt_t *)dsp_bt)->het_sys_map;
 
 	/*map to this value size = 0x1000000*/
@@ -946,9 +990,9 @@ static int release_starcore_B4(void *dsp_bt)
 	printf("GCR_CHMER0=0x%x\n", *(vaddr + GCR_CHMER0));
 	printf("DCFG_BRR=0x%x\n", *(vaddr + DCFG_BRR));
 
-	*(vaddr + LCC_BSTRH) =  0x00000000;
+	*(vaddr + LCC_BSTRH) =  ((intvec_addr >> 32) & 0xF);
 	asm("lwsync");
-	*(vaddr + LCC_BSTRL) =  intvec_addr;
+	*(vaddr + LCC_BSTRL) =  (intvec_addr & U32_T_MASK);
 	asm("lwsync");
 	*(vaddr + LCC_BSTAR) =  0x8100000C;
 	asm("lwsync");
