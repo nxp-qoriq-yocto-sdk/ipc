@@ -1636,7 +1636,7 @@ int check_validation_fields(void *dsp_bt)
 
 	ipc = (os_het_ipc_t *)(shm.vaddr + (uint32_t)ctrl->ipc - shm.paddr);
 	/* Error prone code check here*/
-	uint32_t phys_addr_sh_ctrl =
+	uint64_t phys_addr_sh_ctrl =
 		((dsp_bt_t *)dsp_bt)->het_sys_map.sh_ctrl_area.phys_addr;
 	os_het_l1d_t *l1_defense = (os_het_l1d_t *)(
 		((dsp_bt_t *)dsp_bt)->sh_ctrl_area.vaddr + ctrl->l1d -

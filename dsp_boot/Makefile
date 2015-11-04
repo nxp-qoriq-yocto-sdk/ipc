@@ -8,6 +8,9 @@ CFLAGS=-fPIC -I $(HET_DIR) -I $(FSL_SHM_DIR) -D_FILE_OFFSET_BITS=64 -D_LARGEFILE
 
 ifeq ($(B4860), 1)
   CFLAGS+=-DB4860
+ifeq ($(PROD_REL), 1)
+  CFLAGS+=-DPRODUCTION_REL
+endif
 endif
 
 ifeq ($(B913x), 1)
