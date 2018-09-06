@@ -462,7 +462,7 @@ end:
 	return vaddr;
 }
 
-static int get_phy_addr_from_file(unsigned long *buf_in)
+static int get_phy_addr_from_file(unsigned long long *buf_in)
 {
 
 	FILE *file_d;
@@ -475,7 +475,7 @@ static int get_phy_addr_from_file(unsigned long *buf_in)
 
 	while (!feof(file_d)) {
 
-		if (EOF != fscanf(file_d, "%lx", &buf_in[i])) {
+		if (EOF != fscanf(file_d, "%llx", &buf_in[i])) {
 			i++;
 		} else {
 			num_of_entry_in_buf_in = i/2;
@@ -495,7 +495,7 @@ int fsl_usmmgr_dump_memory(void *mem_dump_buf, size_t size)
 	void *base;
 	unsigned long calculated_total_size = 0, mmap_size = 0, pad_len = 0;
 	unsigned int size_left = size;
-	unsigned long current_addr, buf_in[500], mmap_addr_aligned;
+	unsigned long long current_addr, buf_in[500], mmap_addr_aligned;
 	int count, status;
 	int destination_buf_full_flag = 0;
 
@@ -515,7 +515,7 @@ int fsl_usmmgr_dump_memory(void *mem_dump_buf, size_t size)
 		return STATUS_FAIL;
 	}
 
-	current_addr = (unsigned long)mem_dump_buf;
+	current_addr = (unsigned long) mem_dump_buf;
 	for (i = 0; i < count; i++) {
 
 		pad_len = buf_in[i*2] % PAGE_SIZE;
@@ -528,8 +528,8 @@ int fsl_usmmgr_dump_memory(void *mem_dump_buf, size_t size)
 		mmap_size = buf_in[(i*2)+1];
 		calculated_total_size += mmap_size;
 
-		printf("physical_address=0x%lx  size=0x%lx"
-			" mmap_addr_aligned=0x%lx pad_len=0x%lx\n",
+		printf("physical_address=0x%llx  size=0x%lx"
+			" mmap_addr_aligned=0x%llx pad_len=0x%lx\n",
 			buf_in[(i*2)], mmap_size, mmap_addr_aligned, pad_len);
 
 		if (mmap_size == 0)
@@ -561,7 +561,7 @@ int fsl_usmmgr_dump_memory(void *mem_dump_buf, size_t size)
 				printf("mmap failed\n");
 				return STATUS_FAIL;
 		} else {
-				memcpy((void *)current_addr, (base + pad_len),
+				memcpy((void *)(unsigned long)current_addr, (base + pad_len),
 					mmap_size);
 				if (destination_buf_full_flag == 1) {
 					calculated_total_size = size;
