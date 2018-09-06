@@ -34,4 +34,4 @@ endif
 all:
 	make -C $(KERNEL_DIR) SUBDIRS=$(PWD) modules
 clean:
-	rm *.o *.ko  *.order *.symvers *.mod.c
+	rm -rf *.o *.ko  *.order *.symvers *.mod.c .*.cmd .*_versions
