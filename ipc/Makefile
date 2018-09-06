@@ -22,6 +22,10 @@ ifeq ($(B913x), 1)
   CFLAGS2+=-DB913x
   CFLAGS+=-DB913x
 endif
+ifeq ($(CONFIG_MULTI_RAT), 1)
+	CFLAGS2+=-DCONFIG_MULTI_RAT
+	CFLAGS+=-DCONFIG_MULTI_RAT
+endif
 
 all: mem_lib ipc_lib ipc_test
 ipc_lib:

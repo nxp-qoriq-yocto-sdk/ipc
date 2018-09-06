@@ -14,7 +14,7 @@
 #include "fsl_user_dma.h"
 #include "fsl_bsc913x_ipc.h"
 #include "fsl_heterogeneous_ipc.h"
-#define MAX_CHANNELS 64
+#include "fsl_ipc_kmod.h"
 
 typedef struct {
 	void 		*msg_ring_vaddr;
@@ -30,7 +30,7 @@ typedef struct {
 	unsigned long 	txreq_tb_lbuff_paddr;
 
 	int 		num_channels;
-	ipc_channel_us_t *channels[MAX_CHANNELS];
+	ipc_channel_us_t *channels[MAX_IPC_CHANNELS];
 
 	ipc_p2v_t 	p2vcb;
 

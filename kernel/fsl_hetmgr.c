@@ -74,7 +74,7 @@ static phys_addr_t 		sh_ctrl_area_mark;
 static os_het_control_t	*ctrl;
 
 #ifdef CONFIG_MULTI_RAT
-#define MAX_NUM_IPC_REGIONS 2
+#define MAX_NUM_IPC_REGIONS DEFAULT_RAT_INST
 #endif
 
 static int het_mgr_open(struct inode *inode, struct file *filep);
@@ -556,6 +556,8 @@ static int het_mgr_ioctl(struct inode *inode, struct file *filp,
 	case IOCTL_HET_MGR_GET_RAT_MODE:
 #ifdef CONFIG_MULTI_RAT
 		num_ipc_regions = ctrl->num_ipc_regions;
+#else
+		num_ipc_regions = 1;
 #endif
 		if (copy_to_user((void *)arg, &num_ipc_regions,
 				sizeof(int)))

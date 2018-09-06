@@ -35,8 +35,8 @@
 #define LOCAL_PRODUCER_NUM pa_reserved[0]
 #define LOCAL_CONSUMER_NUM pa_reserved[1]
 
-mem_range_t chvpaddr_arr[TOTAL_IPC_CHANNELS];
-int ch_semid[TOTAL_IPC_CHANNELS];
+mem_range_t chvpaddr_arr[DEFAULT_RAT_INST][MAX_IPC_CHANNELS];
+int ch_semid[DEFAULT_RAT_INST][MAX_IPC_CHANNELS];
 extern shm_seg_t shm;
 uint32_t g_core_mask;
 
@@ -94,14 +94,12 @@ fsl_ipc_t fsl_ipc_init_rat(uint32_t rat_id, ipc_p2v_t p2vcb,
 {
 	int ret = ERR_SUCCESS;
 	ipc_userspace_t *ipc_priv = NULL;
-	int i, dev_het_mgr = 0, num_ipc_regions = 0;
+	int i, dev_het_mgr = 0, num_ipc_regions = 1;
 	ENTER();
-
 	if (!p2vcb) {
 		ret = -ERR_P2V_NULL;
 		goto end;
 	}
-
 	if (rat_id != 0) {
 		dev_het_mgr = open("/dev/het_mgr", O_RDWR);
 		if (dev_het_mgr == -1) {
@@ -133,7 +131,7 @@ fsl_ipc_t fsl_ipc_init_rat(uint32_t rat_id, ipc_p2v_t p2vcb,
 	memcpy(&ipc_priv->sh_ctrl_area, &sh_ctrl_area, sizeof(mem_range_t));
 	memcpy(&ipc_priv->dsp_ccsr, &dsp_ccsr, sizeof(mem_range_t));
 	memcpy(&ipc_priv->pa_ccsr, &pa_ccsr, sizeof(mem_range_t));
-
+	ipc_priv->rat_id = rat_id;
 	/* Read number of channels and
 	   max msg size from sh_ctrl_area */
 	ret = get_channels_info(ipc_priv, rat_id);
@@ -141,15 +139,15 @@ fsl_ipc_t fsl_ipc_init_rat(uint32_t rat_id, ipc_p2v_t p2vcb,
 	if (ret)
 		goto end;
 
-	for (i = 0; i < TOTAL_IPC_CHANNELS; i++) {
-		chvpaddr_arr[i].phys_addr = __get_channel_paddr(i, ipc_priv);
-		chvpaddr_arr[i].vaddr = __get_channel_vaddr(i, ipc_priv);
+	for (i = 0; i < MAX_IPC_CHANNELS; i++) {
+		chvpaddr_arr[rat_id][i].phys_addr = __get_channel_paddr(i, ipc_priv);
+		chvpaddr_arr[rat_id][i].vaddr = __get_channel_vaddr(i, ipc_priv);
 	}
-	ipc_priv->rat_id = rat_id;
+
 
 #ifdef CONFIG_LOCK
-	for (i = 0; i < TOTAL_IPC_CHANNELS; i++)
-		ch_semid[i] = fsl_ipc_init_lock(chvpaddr_arr[i].phys_addr);
+	for (i = 0; i < MAX_IPC_CHANNELS; i++)
+		ch_semid[rat_id][i] = fsl_ipc_init_lock(chvpaddr_arr[rat_id][i].phys_addr);
 #endif
 
 	memcpy(ipc_priv->uio_dev_buf, uiodevbuf, strlen(uiodevbuf));
@@ -175,8 +173,8 @@ void fsl_ipc_exit(fsl_ipc_t ipc)
 	close(ipc_priv->dev_het_ipc);
 
 #ifdef CONFIG_LOCK
-	for (i = 0; i < TOTAL_IPC_CHANNELS; i++)
-		fsl_ipc_destroy_lock(ch_semid[i]);
+	for (i = 0; i < MAX_IPC_CHANNELS; i++)
+		fsl_ipc_destroy_lock(ch_semid[ipc_priv->rat_id][i]);
 #endif
 
 	/* free memory */
@@ -236,7 +234,7 @@ int fsl_ipc_configure_channel(uint32_t channel_id, uint32_t depth,
 
 	ch = get_channel_vaddr(channel_id, ipc_priv);
 
-	ret = fsl_ipc_lock(ch_semid[channel_id]);
+	ret = fsl_ipc_lock(ch_semid[ipc_priv->rat_id][channel_id]);
 	if (ret < 0) {
 		EXIT(ret);
 		goto end;
@@ -278,7 +276,7 @@ int fsl_ipc_configure_channel(uint32_t channel_id, uint32_t depth,
 	ch->consumer_initialized = OS_HET_INITIALIZED;
 end:
 	if (locked)
-		fsl_ipc_unlock(ch_semid[channel_id]);
+		fsl_ipc_unlock(ch_semid[ipc_priv->rat_id][channel_id]);
 
 #if DEBUG_RELOAD
 	printf("dump_ipc_channel_ in %s\n", __func__);
@@ -310,7 +308,7 @@ int fsl_ipc_configure_txreq(uint32_t channel_id, unsigned long phys_addr,
 
 	ipc_ch = get_channel_vaddr(channel_id, ipc_priv);
 
-	ret = fsl_ipc_lock(ch_semid[channel_id]);
+	ret = fsl_ipc_lock(ch_semid[ipc_priv->rat_id][channel_id]);
 	if (ret < 0) {
 		EXIT(ret);
 		goto end;
@@ -352,7 +350,7 @@ int fsl_ipc_configure_txreq(uint32_t channel_id, unsigned long phys_addr,
 
 end:
 	if (locked)
-		fsl_ipc_unlock(ch_semid[channel_id]);
+		fsl_ipc_unlock(ch_semid[ipc_priv->rat_id][channel_id]);
 
 	EXIT(ret);
 	return ret;
@@ -388,7 +386,7 @@ int fsl_ipc_send_tx_req(uint32_t channel_id, sg_list_t *sgl,
 		goto end;
 	}
 
-	ret = fsl_ipc_lock(ch_semid[channel_id]);
+	ret = fsl_ipc_lock(ch_semid[ipc_priv->rat_id][channel_id]);
 	if (ret < 0) {
 		EXIT(ret);
 		goto end;
@@ -519,7 +517,7 @@ int fsl_ipc_send_tx_req(uint32_t channel_id, sg_list_t *sgl,
 	ipc_priv->txreq_inprocess = 1;
 end:
 	if (locked)
-		fsl_ipc_unlock(ch_semid[channel_id]);
+		fsl_ipc_unlock(ch_semid[ipc_priv->rat_id][channel_id]);
 
 	EXIT(ret);
 	return ret;
@@ -559,7 +557,7 @@ int fsl_ipc_set_consumed_status(uint32_t channel_id, fsl_ipc_t ipc)
 
 	ipc_ch = get_channel_vaddr(channel_id, ipc_priv);
 
-	ret = fsl_ipc_lock(ch_semid[channel_id]);
+	ret = fsl_ipc_lock(ch_semid[ipc_priv->rat_id][channel_id]);
 	if (ret < 0) {
 		EXIT(ret);
 		goto end;
@@ -574,7 +572,7 @@ int fsl_ipc_set_consumed_status(uint32_t channel_id, fsl_ipc_t ipc)
 
 end:
 	if (locked)
-		fsl_ipc_unlock(ch_semid[channel_id]);
+		fsl_ipc_unlock(ch_semid[ipc_priv->rat_id][channel_id]);
 
 	return ret;
 }
@@ -639,7 +637,7 @@ int fsl_ipc_send_ptr(uint32_t channel_id, unsigned long addr, uint32_t len,
 		goto end;
 	}
 
-	ret = fsl_ipc_lock(ch_semid[channel_id]);
+	ret = fsl_ipc_lock(ch_semid[ipc_priv->rat_id][channel_id]);
 	if (ret < 0) {
 		EXIT(ret);
 		goto end;
@@ -671,7 +669,7 @@ int fsl_ipc_send_ptr(uint32_t channel_id, unsigned long addr, uint32_t len,
 
 end:
 	if (locked)
-		fsl_ipc_unlock(ch_semid[channel_id]);
+		fsl_ipc_unlock(ch_semid[ipc_priv->rat_id][channel_id]);
 
 	return ret;
 }
@@ -707,7 +705,6 @@ int fsl_ipc_open_prod_ch(uint32_t channel_id, fsl_ipc_t ipc)
 
 	ipc_priv = (ipc_userspace_t *)ipc;
 	ipc_ch = get_channel_vaddr(channel_id, ipc_priv);
-
 	ipc_ch->producer_initialized = OS_HET_INITIALIZED;
 
 	EXIT(0);
@@ -741,7 +738,7 @@ int fsl_ipc_send_msg(uint32_t channel_id, void *src_buf_addr, uint32_t len,
 	}
 	debug_print("\n num free bds = %d \n", os_het_ch_free_bds(ipc_ch));
 
-	ret = fsl_ipc_lock(ch_semid[channel_id]);
+	ret = fsl_ipc_lock(ch_semid[ipc_priv->rat_id][channel_id]);
 	if (ret < 0) {
 		EXIT(ret);
 		goto end;
@@ -789,7 +786,7 @@ int fsl_ipc_send_msg(uint32_t channel_id, void *src_buf_addr, uint32_t len,
 
 end:
 	if (locked)
-		fsl_ipc_unlock(ch_semid[channel_id]);
+		fsl_ipc_unlock(ch_semid[ipc_priv->rat_id][channel_id]);
 	return ret;
 }
 
@@ -819,7 +816,7 @@ int fsl_ipc_recv_ptr(uint32_t channel_id, unsigned long *addr, uint32_t *len,
 
 	}
 
-	ret = fsl_ipc_lock(ch_semid[channel_id]);
+	ret = fsl_ipc_lock(ch_semid[ipc_priv->rat_id][channel_id]);
 	if (ret < 0) {
 		EXIT(ret);
 		goto end;
@@ -844,7 +841,7 @@ int fsl_ipc_recv_ptr(uint32_t channel_id, unsigned long *addr, uint32_t *len,
 
 end:
 	if (locked)
-		fsl_ipc_unlock(ch_semid[channel_id]);
+		fsl_ipc_unlock(ch_semid[ipc_priv->rat_id][channel_id]);
 
 	EXIT(ret);
 	return ret;
@@ -866,7 +863,7 @@ int fsl_ipc_recv_ptr_hold(uint32_t channel_id, unsigned long *addr,
 
 	ipc_ch = get_channel_vaddr(channel_id, ipc_priv);
 
-	ret = fsl_ipc_lock(ch_semid[channel_id]);
+	ret = fsl_ipc_lock(ch_semid[ipc_priv->rat_id][channel_id]);
 	if (ret < 0) {
 		EXIT(ret);
 		goto end;
@@ -889,7 +886,7 @@ int fsl_ipc_recv_ptr_hold(uint32_t channel_id, unsigned long *addr,
 
 end:
 	if (locked)
-		fsl_ipc_unlock(ch_semid[channel_id]);
+		fsl_ipc_unlock(ch_semid[ipc_priv->rat_id][channel_id]);
 	return ret;
 }
 
@@ -910,7 +907,7 @@ int fsl_ipc_recv_msg(uint32_t channel_id, void *addr, uint32_t *len,
 
 	ipc_ch = get_channel_vaddr(channel_id, ipc_priv);
 
-	ret = fsl_ipc_lock(ch_semid[channel_id]);
+	ret = fsl_ipc_lock(ch_semid[ipc_priv->rat_id][channel_id]);
 	if (ret < 0) {
 		EXIT(ret);
 		goto end;
@@ -939,7 +936,7 @@ int fsl_ipc_recv_msg(uint32_t channel_id, void *addr, uint32_t *len,
 
 end:
 	if (locked)
-		fsl_ipc_unlock(ch_semid[channel_id]);
+		fsl_ipc_unlock(ch_semid[ipc_priv->rat_id][channel_id]);
 	return ret;
 }
 
@@ -965,7 +962,7 @@ int fsl_ipc_recv_msg_ptr(uint32_t channel_id, void **dst_buffer,
 		goto end;
 	}
 
-	ret = fsl_ipc_lock(ch_semid[channel_id]);
+	ret = fsl_ipc_lock(ch_semid[ipc_priv->rat_id][channel_id]);
 	if (ret < 0) {
 		EXIT(ret);
 		goto end;
@@ -988,7 +985,7 @@ int fsl_ipc_recv_msg_ptr(uint32_t channel_id, void **dst_buffer,
 
 end:
 	if (locked)
-		fsl_ipc_unlock(ch_semid[channel_id]);
+		fsl_ipc_unlock(ch_semid[ipc_priv->rat_id][channel_id]);
 	return ret;
 }
 /**************** Internal API ************************/
@@ -1034,7 +1031,7 @@ int get_ipc_inst(ipc_userspace_t *ipc_priv, uint32_t inst_id)
 		ret = -1;
 		goto end;
 	}
-	if (ipc->num_ipc_channels > MAX_CHANNELS) {
+	if (ipc->num_ipc_channels > MAX_IPC_CHANNELS) {
 		ret = -1;
 		goto end;
 	}
@@ -1112,7 +1109,7 @@ static void *__get_channel_vaddr(uint32_t channel_id,
 static unsigned long get_channel_paddr(uint32_t channel_id,
 		ipc_userspace_t *ipc_priv)
 {
-	return chvpaddr_arr[channel_id].phys_addr;
+	return chvpaddr_arr[ipc_priv->rat_id][channel_id].phys_addr;
 }
 
 /*
@@ -1125,7 +1122,7 @@ static unsigned long get_channel_paddr(uint32_t channel_id,
  */
 static void *get_channel_vaddr(uint32_t channel_id, ipc_userspace_t *ipc_priv)
 {
-	return chvpaddr_arr[channel_id].vaddr;
+	return chvpaddr_arr[ipc_priv->rat_id][channel_id].vaddr;
 }
 /*
  * @init_het_ipc
@@ -1307,8 +1304,14 @@ int fsl_B4_ipc_init(void *dsp_bt)
 	if (ret) {
 		perror("IOCTL_HET_MGR_GET_RAT_MODE:");
 		return -1;
-	} else if (num_ipc_regions == DEFAULT_RAT_INST)
-		rat_inst = 1;
+	} else if (num_ipc_regions > DEFAULT_RAT_INST) {
+		printf("num_ipc_regions =%d DEFAULT_RAT_INST=%d\n", num_ipc_regions, DEFAULT_RAT_INST);
+		perror("num_ipc_regions grather than the maximum number of RAT instances:");
+		return -1;
+
+	} else {
+		rat_inst = num_ipc_regions;
+	}
 
 	/* Get IPC_PARAMS */
 	ret = ioctl(dev_het_mgr,
@@ -1338,8 +1341,19 @@ int fsl_B4_ipc_init(void *dsp_bt)
 			channel_depth);
 	}
 
-	if (rat_inst == 0) {
 
+	/*calculate size of ipc channels*/
+	size = sizeof(os_het_ipc_channel_t)*num_channels +
+	/* array to hold channel pointers */
+		sizeof(os_het_ipc_bd_t)*num_channels*channel_depth;
+	/* ptr channel ring buffer */
+
+	for (j = 0; j < rat_inst; j++) {
+
+		ipc = (void *)(shm.vaddr + (uint32_t)ctrl->ipc -
+			shm.paddr + j*sizeof(os_het_ipc_t));
+
+		ipc_ch_start_paddr += j * size;
 		ipc->ipc_channels = ipc_ch_start_paddr;
 		ch = (os_het_ipc_channel_t *)
 			(shm.vaddr + ipc_ch_start_paddr - shm.paddr);
@@ -1353,68 +1367,26 @@ int fsl_B4_ipc_init(void *dsp_bt)
 			sizeof(os_het_ipc_channel_t)*num_channels;
 
 		/*
-		In a loop of num_channels, set the ptr of channel structures
-		in ipc->channels
+		In a loop of num_channels, set the ptr of channel
+		structures in ipc->channels
 		*/
+
 		for (i = 0; i < num_channels; i++) {
-			ch[i].start_validation_value = HET_START_VALID_VALUE;
-			ch[i].end_validation_value = HET_END_VALID_VALUE;
+			ch[i].start_validation_value =
+				HET_START_VALID_VALUE;
+			ch[i].end_validation_value =
+				HET_END_VALID_VALUE;
 			ch[i].ipc_ind = OS_HET_NO_INT;
 			ch[i].id = i;
 			ch[i].bd_base = phys_addr1;
-			phys_addr1 += sizeof(os_het_ipc_bd_t)*channel_depth;
+			phys_addr1 +=
+				sizeof(os_het_ipc_bd_t)*channel_depth;
 		}
+
 
 		open_channel_zero(ch, channel_depth);
-
-	} else if (rat_inst == 1) {
-
-		/*calculate size of ipc channels*/
-		size = sizeof(os_het_ipc_channel_t)*num_channels +
-		/* array to hold channel pointers */
-			sizeof(os_het_ipc_bd_t)*num_channels*channel_depth;
-		/* ptr channel ring buffer */
-
-
-		for (j = 0; j <= rat_inst; j++) {
-
-			ipc = (void *)(shm.vaddr + (uint32_t)ctrl->ipc -
-				shm.paddr + j*sizeof(os_het_ipc_t));
-
-			ipc_ch_start_paddr += j * size;
-			ipc->ipc_channels = ipc_ch_start_paddr;
-			ch = (os_het_ipc_channel_t *)
-				(shm.vaddr + ipc_ch_start_paddr - shm.paddr);
-
-			ipc->num_ipc_channels = num_channels;
-			ipc->ipc_max_bd_size = channel_depth;
-			ipc->start_validation_value = HET_START_VALID_VALUE;
-			ipc->end_validation_value = HET_END_VALID_VALUE;
-
-			phys_addr1 = ipc_ch_start_paddr +
-				sizeof(os_het_ipc_channel_t)*num_channels;
-
-			/*
-			In a loop of num_channels, set the ptr of channel
-			structures in ipc->channels
-			*/
-
-			for (i = 0; i < num_channels; i++) {
-				ch[i].start_validation_value =
-					HET_START_VALID_VALUE;
-				ch[i].end_validation_value =
-					HET_END_VALID_VALUE;
-				ch[i].ipc_ind = OS_HET_NO_INT;
-				ch[i].id = i;
-				ch[i].bd_base = phys_addr1;
-				phys_addr1 +=
-					sizeof(os_het_ipc_bd_t)*channel_depth;
-			}
-
-
-			open_channel_zero(ch, channel_depth);
-		}
 	}
+
 
 	return ERR_SUCCESS;
 }
@@ -1470,14 +1442,17 @@ int fsl_913x_ipc_init(void *dsp_bt)
 
 	/* Get RAT MODE */
 	ret = ioctl(dev_het_mgr,
-		IOCTL_HET_MGR_GET_RAT_MODE,
-		&num_ipc_regions);
+		     IOCTL_HET_MGR_GET_RAT_MODE,
+		     &num_ipc_regions);
 	if (ret) {
 		perror("IOCTL_HET_MGR_GET_RAT_MODE:");
 		return -1;
-	} else if (num_ipc_regions == DEFAULT_RAT_INST)
-		rat_inst = 1;
-
+	} else if (num_ipc_regions > DEFAULT_RAT_INST) {
+		perror("num_ipc_regions grather than the maximum number of RAT instances:");
+		return -1;
+	} else {
+		rat_inst = num_ipc_regions;
+	}
 
 	/* Get IPC_PARAMS */
 	ret = ioctl(dev_het_mgr,
@@ -1507,13 +1482,26 @@ int fsl_913x_ipc_init(void *dsp_bt)
 			channel_depth);
 	}
 
+	/*calculate size of ipc channels*/
+	size = sizeof(os_het_ipc_channel_t)*num_channels +
+	/* array to hold channel pointers */
+		sizeof(os_het_ipc_bd_t)*num_channels*channel_depth;
+	/* ptr channel ring buffer */
 
-	if (rat_inst == 0) {
 
+	for (j = 0; j < rat_inst; j++) {
+
+		ipc = vaddr + ctrl->ipc - sh_ctrl_area.phys_addr +
+			j*sizeof(os_het_ipc_t);
+
+		ipc_ch_start_paddr += j *
+			(size + sizeof(os_het_ipc_t));
 		memcpy(&ipc->ipc_channels, &ipc_ch_start_paddr,
 				sizeof(uint32_t));
 		ch = (os_het_ipc_channel_t *)
-			(vaddr + ipc_ch_start_paddr - sh_ctrl_area.phys_addr);
+			(vaddr + ipc_ch_start_paddr -
+			 sh_ctrl_area.phys_addr);
+
 		ipc->num_ipc_channels = num_channels;
 		ipc->ipc_max_bd_size = channel_depth;
 
@@ -1521,64 +1509,21 @@ int fsl_913x_ipc_init(void *dsp_bt)
 			sizeof(os_het_ipc_channel_t)*num_channels;
 
 		/*
-		In a loop of num_channels, set the ptr of channel structures
-		in ipc->channels
+		In a loop of num_channels, set the ptr of channel
+		structures in ipc->channels
 		*/
+
 		for (i = 0; i < num_channels; i++) {
 			ch[i].ipc_ind = OS_HET_NO_INT;
 			ch[i].id = i;
 			memcpy(&ch[i].bd_base, &phys_addr1,
 					sizeof(uint32_t));
-			phys_addr1 += sizeof(os_het_ipc_bd_t)*channel_depth;
+			phys_addr1 +=
+				sizeof(os_het_ipc_bd_t)*channel_depth;
 		}
+
 
 		open_channel_zero(ch, channel_depth);
-
-	} else if (rat_inst == 1) {
-
-		/*calculate size of ipc channels*/
-		size = sizeof(os_het_ipc_channel_t)*num_channels +
-		/* array to hold channel pointers */
-			sizeof(os_het_ipc_bd_t)*num_channels*channel_depth;
-		/* ptr channel ring buffer */
-
-
-		for (j = 0; j <= rat_inst; j++) {
-
-			ipc = vaddr + ctrl->ipc - sh_ctrl_area.phys_addr +
-				j*sizeof(os_het_ipc_t);
-
-			ipc_ch_start_paddr += j *
-				(size + sizeof(os_het_ipc_t));
-			memcpy(&ipc->ipc_channels, &ipc_ch_start_paddr,
-					sizeof(uint32_t));
-			ch = (os_het_ipc_channel_t *)
-				(vaddr + ipc_ch_start_paddr -
-				 sh_ctrl_area.phys_addr);
-
-			ipc->num_ipc_channels = num_channels;
-			ipc->ipc_max_bd_size = channel_depth;
-
-			phys_addr1 = ipc_ch_start_paddr +
-				sizeof(os_het_ipc_channel_t)*num_channels;
-
-			/*
-			In a loop of num_channels, set the ptr of channel
-			structures in ipc->channels
-			*/
-
-			for (i = 0; i < num_channels; i++) {
-				ch[i].ipc_ind = OS_HET_NO_INT;
-				ch[i].id = i;
-				memcpy(&ch[i].bd_base, &phys_addr1,
-						sizeof(uint32_t));
-				phys_addr1 +=
-					sizeof(os_het_ipc_bd_t)*channel_depth;
-			}
-
-
-			open_channel_zero(ch, channel_depth);
-		}
 	}
 
 	return ERR_SUCCESS;
@@ -1652,8 +1597,14 @@ int check_validation_fields(void *dsp_bt)
 	if (ret) {
 		perror("IOCTL_HET_MGR_GET_RAT_MODE:");
 		return -1;
-	} else if (num_ipc_regions == DEFAULT_RAT_INST)
-		rat_inst = 1;
+	} else if (num_ipc_regions > DEFAULT_RAT_INST) {
+		printf("num_ipc_regions =%d DEFAULT_RAT_INST=%d \n", num_ipc_regions, DEFAULT_RAT_INST);
+		perror("num_ipc_regions grather than the maximum number of RAT instances:");
+		return -1;
+
+	} else {
+		rat_inst = num_ipc_regions;
+	}
 
 	/* Get IPC_PARAMS */
 	ret = ioctl(dev_het_mgr,
@@ -1681,63 +1632,45 @@ int check_validation_fields(void *dsp_bt)
 		return -1;
 	}
 
-	if (rat_inst == 0) {
-		if (ipc->start_validation_value != HET_START_VALID_VALUE ||
-		    ipc->end_validation_value != HET_END_VALID_VALUE)
+
+	/*calculate size of ipc channels*/
+	size = sizeof(os_het_ipc_channel_t)*num_channels +
+	/* array to hold channel pointers */
+		sizeof(os_het_ipc_bd_t)*num_channels*channel_depth;
+	/* ptr channel ring buffer */
+
+
+	for (j = 0; j <= rat_inst; j++) {
+
+		ipc = (void *)(shm.vaddr + (uint32_t)ctrl->ipc -
+			shm.paddr + j*sizeof(os_het_ipc_t));
+
+		ipc_ch_start_paddr += j * size;
+		if (ipc->start_validation_value !=
+		HET_START_VALID_VALUE ||
+		ipc->end_validation_value !=
+		HET_END_VALID_VALUE)
 			return OS_HET_ERR_L1D_MEMORY_CORRUPTED;
 
 		ch = (os_het_ipc_channel_t *)
 			(shm.vaddr + ipc_ch_start_paddr - shm.paddr);
 
+		/*
+		In a loop of num_channels, set the ptr of channel
+		structures in ipc->channels
+		*/
+
 		for (i = 0; i < num_channels; i++) {
 			if (ch[i].start_validation_value !=
-			HET_START_VALID_VALUE ||
-			ch[i].end_validation_value !=
-			HET_END_VALID_VALUE)
+			    HET_START_VALID_VALUE ||
+			    ch[i].end_validation_value !=
+			    HET_END_VALID_VALUE)
 				return OS_HET_ERR_L1D_MEMORY_CORRUPTED;
 
 		}
 
-	} else if (rat_inst == 1) {
-
-		/*calculate size of ipc channels*/
-		size = sizeof(os_het_ipc_channel_t)*num_channels +
-		/* array to hold channel pointers */
-			sizeof(os_het_ipc_bd_t)*num_channels*channel_depth;
-		/* ptr channel ring buffer */
-
-
-		for (j = 0; j <= rat_inst; j++) {
-
-			ipc = (void *)(shm.vaddr + (uint32_t)ctrl->ipc -
-				shm.paddr + j*sizeof(os_het_ipc_t));
-
-			ipc_ch_start_paddr += j * size;
-			if (ipc->start_validation_value !=
-			HET_START_VALID_VALUE ||
-			ipc->end_validation_value !=
-			HET_END_VALID_VALUE)
-				return OS_HET_ERR_L1D_MEMORY_CORRUPTED;
-
-			ch = (os_het_ipc_channel_t *)
-				(shm.vaddr + ipc_ch_start_paddr - shm.paddr);
-
-			/*
-			In a loop of num_channels, set the ptr of channel
-			structures in ipc->channels
-			*/
-
-			for (i = 0; i < num_channels; i++) {
-				if (ch[i].start_validation_value !=
-				    HET_START_VALID_VALUE ||
-				    ch[i].end_validation_value !=
-				    HET_END_VALID_VALUE)
-					return OS_HET_ERR_L1D_MEMORY_CORRUPTED;
-
-			}
-
-		}
 	}
+
 
 
 	if (l1_defense->start_validation_value != HET_START_VALID_VALUE ||
