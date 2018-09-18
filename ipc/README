@@ -61,11 +61,15 @@ I. Kernel loadable modules:
         Install the ".ko" with the following command after the Linux is booted.
         Run step 5 only if you want to build kernel modules for multirat applications
    5. run make clean; make B4860=1 CONFIG_MULTI_RAT=1
+	Here "CONFIG_MULTI_RAT=1" is optional for multi RATs.
 
 II. User space code:
    1. cd ipc
    2. Set CROSS_COMPILE as the <path of toolchain>/.../powerpc-linux-gnu- (toolchain should be 32 bit toolchain)
    3. make B4860=1
+	for multi RATs "CONFIG_MULTI_RAT=1" optional flag is required.
+	i.e. - make B4860=1 CONFIG_MULTI_RAT=1
+
    4. Following user space libraries and binaries get generated:
       1. under ipc directory
          - libipc.so,
