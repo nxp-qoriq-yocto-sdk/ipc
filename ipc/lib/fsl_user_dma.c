@@ -134,9 +134,17 @@ fsl_udma_t fsl_uspace_dma_init(mem_range_t dma_list_mem, mem_range_t pa_ccsr,
 		perror("mmap failed\n");
 	debug_print("dma addr = %x\n", (uint32_t)dma);
 
-	dma_priv->dma =
-	    (volatile dma_regs_t *)((unsigned long)dma + DMA_REG_OFFSET
-			+dma_ch_id*DMA_CH_OFFSET);
+	/* Offsets are asymmetrical between 4 and 5 DMA Channel */
+	if(dma_ch_id < 4) {
+		dma_priv->dma =
+		    (volatile dma_regs_t *)((unsigned long)dma + DMA_REG_OFFSET
+				+dma_ch_id*DMA_CH_OFFSET);
+	} else {
+		dma_priv->dma =
+			(volatile dma_regs_t *)((unsigned long)dma + DMA_REG_OFFSET
+				+ (dma_ch_id * DMA_CH_OFFSET) + 0x100);
+	}
+
 	dma_priv->dma_list = (dma_list_t *) dma_list_mem.vaddr;
 	fsl_uspace_dma_list_clear(dma_priv);
 
