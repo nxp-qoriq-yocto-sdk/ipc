@@ -21,8 +21,6 @@
 #define EXIT(A)	printf("<< (%d) %s %d %s\n", A, __FILE__, __LINE__, __func__)
 #define mute_print(...)
 
-#define MAX_NUM_RATS_USED	6
-#define UIO_NAME_LENGTH		12
 
 fsl_usmmgr_t usmmgr;
 int ch7init[MAX_NUM_RATS_USED];

@@ -22,9 +22,9 @@
 #define mute_print(...)
 
 fsl_usmmgr_t usmmgr;
-fsl_ipc_t ipc;
-int ch3init;
-int ch4init;
+fsl_ipc_t ipc[MAX_NUM_RATS_USED];
+int ch3init[MAX_NUM_RATS_USED];
+int ch4init[MAX_NUM_RATS_USED];
 void test_init(int rat_id);
 int rat_id, loop, mute_flag, loop2;
 
@@ -93,16 +93,19 @@ void channel3_thread(void *ptr)
 	int depth = 16;
 	char bs[20] = { 0 };
 	ENTER();
-	ret = fsl_ipc_configure_channel(3, depth, IPC_PTR_CH, 0, 0, NULL, ipc);
+	int rat_id = *(int *)ptr;
+
+	ret = fsl_ipc_configure_channel(3, depth, IPC_PTR_CH, 0, 0,
+					NULL, ipc[rat_id]);
 	if (ret) {
 		printf("\n ret %x \n", ret);
 		EXIT(ret);
 		pthread_exit(0);
 	}
-	ch3init = 1;
+	ch3init[rat_id] = 1;
 	while (1) {
 		do {
-			ret = fsl_ipc_recv_ptr(3, &p, &len, ipc);
+			ret = fsl_ipc_recv_ptr(3, &p, &len, ipc[rat_id]);
 			usleep(1000);
 		} while (ret == -ERR_CHANNEL_EMPTY);
 		if (ret) {
@@ -111,10 +114,9 @@ void channel3_thread(void *ptr)
 			goto end;
 		}
 		printf("\n[IPC_PA%d] R:C3:P:[%lx]L:%x\n", rat_id, p, len);
-
 		sprintf(bs, "%x ", ctr++);
 		do {
-			ret = fsl_ipc_send_msg(2, bs, 9, ipc);
+			ret = fsl_ipc_send_msg(2, bs, 9, ipc[rat_id]);
 		} while (ret == -ERR_CHANNEL_FULL);
 		if (ret) {
 			printf("\n ret %x \n", ret);
@@ -135,17 +137,20 @@ void channel4_thread(void *ptr)
 	int depth = 16;
 	char retbuf[1024];
 	void *vaddr;
+	int rat_id = *(int *)ptr;
 	ENTER();
-	ret = fsl_ipc_configure_channel(4, depth, IPC_PTR_CH, 0, 0, NULL, ipc);
+
+	ret = fsl_ipc_configure_channel(4, depth, IPC_PTR_CH, 0, 0,
+					NULL, ipc[rat_id]);
 	if (ret) {
 		printf("\n ret %x \n", ret);
 		EXIT(ret);
 		pthread_exit(0);
 	}
-	ch4init = 1;
+	ch4init[rat_id] = 1;
 	while (1) {
 		do {
-			ret = fsl_ipc_recv_ptr(4, &p, &len, ipc);
+			ret = fsl_ipc_recv_ptr(4, &p, &len, ipc[rat_id]);
 			usleep(1000);
 		} while (ret == -ERR_CHANNEL_EMPTY);
 		if (ret) {
@@ -164,7 +169,7 @@ void channel4_thread(void *ptr)
 
 		memcpy(retbuf, vaddr, len);
 		do {
-			ret = fsl_ipc_send_msg(5, retbuf, len, ipc);
+			ret = fsl_ipc_send_msg(5, retbuf, len, ipc[rat_id]);
 			usleep(1000);
 		} while (ret == -ERR_CHANNEL_FULL);
 		if (ret) {
@@ -188,17 +193,19 @@ void channel3_thread_m(void *ptr)
 	int ctr = 0, ch3recv_ctr = 0;
 	int depth = 16;
 	char bs[20] = { 0 };
+	int rat_id = *(int *)ptr;
 
-	ret = fsl_ipc_configure_channel(3, depth, IPC_PTR_CH, 0, 0, NULL, ipc);
+	ret = fsl_ipc_configure_channel(3, depth, IPC_PTR_CH, 0, 0,
+			NULL, ipc[rat_id]);
 	if (ret) {
 		printf("\n ret %x \n", ret);
 		EXIT(ret);
 		pthread_exit(0);
 	}
-	ch3init = 1;
+	ch3init[rat_id] = 1;
 	while (loop-- > 0) {
 		do {
-			ret = fsl_ipc_recv_ptr(3, &p, &len, ipc);
+			ret = fsl_ipc_recv_ptr(3, &p, &len, ipc[rat_id]);
 			usleep(1000);
 			tr++;
 			if (ret == ERR_SUCCESS)
@@ -220,7 +227,7 @@ void channel3_thread_m(void *ptr)
 
 		sprintf(bs, "%x ", ctr++);
 		do {
-			ret = fsl_ipc_send_msg(2, bs, 9, ipc);
+			ret = fsl_ipc_send_msg(2, bs, 9, ipc[rat_id]);
 			usleep(1000);
 			ts++;
 			if (ret == ERR_SUCCESS)
@@ -260,17 +267,19 @@ void channel4_thread_m(void *ptr)
 	int depth = 16, ch5send_ctr = 0;
 	char retbuf[1024];
 	void *vaddr;
+	int rat_id = *(int *)ptr;
 
-	ret = fsl_ipc_configure_channel(4, depth, IPC_PTR_CH, 0, 0, NULL, ipc);
+	ret = fsl_ipc_configure_channel(4, depth, IPC_PTR_CH, 0, 0,
+					NULL, ipc[rat_id]);
 	if (ret) {
 		printf("\n ret %x \n", ret);
 		EXIT(ret);
 		pthread_exit(0);
 	}
-	ch4init = 1;
+	ch4init[rat_id] = 1;
 	while (loop2-- > 0) {
 		do {
-			ret = fsl_ipc_recv_ptr(4, &p, &len, ipc);
+			ret = fsl_ipc_recv_ptr(4, &p, &len, ipc[rat_id]);
 			usleep(1000);
 			tr++;
 			if (ret == ERR_SUCCESS)
@@ -299,7 +308,7 @@ void channel4_thread_m(void *ptr)
 
 		memcpy(retbuf, vaddr, len);
 		do {
-			ret = fsl_ipc_send_msg(5, retbuf, len, ipc);
+			ret = fsl_ipc_send_msg(5, retbuf, len, ipc[rat_id]);
 			usleep(1000);
 			ts++;
 			if (ret == ERR_SUCCESS)
@@ -345,6 +354,7 @@ void test_init(int rat_id)
 	mem_range_t sh_ctrl;
 	mem_range_t dsp_ccsr;
 	mem_range_t pa_ccsr;
+	char uio_interface[UIO_NAME_LENGTH];
 
 	printf("\n=========$IPC TEST$====%s %s====\n", __DATE__, __TIME__);
 
@@ -373,36 +383,29 @@ void test_init(int rat_id)
 		return;
 	}
 
-	if (rat_id == 0) {
-		/* use of fsl_ipc_init is deprecated
-		* Instead use fsl_ipc_init_rat with rat_id 0,
-		* for non-MULTI RAT scenarios*/
-		ipc = fsl_ipc_init(
-			test_p2v, sh_ctrl, dsp_ccsr, pa_ccsr, UIO_INTERFACE);
-	} else {
-		ipc = fsl_ipc_init_rat(
-			rat_id,
-			test_p2v, sh_ctrl, dsp_ccsr, pa_ccsr, UIO_INTERFACE);
-	}
+	sprintf(uio_interface, "/dev/uio%d", rat_id);
+	ipc[rat_id] = fsl_ipc_init_rat(
+		rat_id,
+		test_p2v, sh_ctrl, dsp_ccsr, pa_ccsr, uio_interface);
 
-	if (!ipc) {
+	if (!ipc[rat_id]) {
 		printf("Issue with fsl_ipc_init %d\n", ret);
 		return;
 	}
 	do {
-		fsl_ipc_chk_recv_status(&bmask, ipc);
+		fsl_ipc_chk_recv_status(&bmask, ipc[rat_id]);
 		usleep(10000);
 		if (!bmask)
 			printf("\n main loop #ret %llx \n",
 				(long long unsigned int)bmask);
 	} while (!(isbitset(bmask, 0)));
 
-	fsl_ipc_open_prod_ch(2, ipc);
-	fsl_ipc_open_prod_ch(5, ipc);
+	fsl_ipc_open_prod_ch(2, ipc[rat_id]);
+	fsl_ipc_open_prod_ch(5, ipc[rat_id]);
 
 	if (mute_flag == 1) {
 		ret1 = pthread_create(&thread1, NULL,
-				(void *)&channel3_thread_m, NULL);
+				(void *)&channel3_thread_m, (void *) &rat_id);
 		if (ret1) {
 			printf("pthread_create returns with error: %d", ret1);
 			printf("from channel3_thread_m\n");
@@ -410,7 +413,7 @@ void test_init(int rat_id)
 		}
 
 		ret2 = pthread_create(&thread2, NULL,
-				(void *)&channel4_thread_m, NULL);
+				(void *)&channel4_thread_m, (void *) &rat_id);
 		if (ret2) {
 			printf("pthread_create returns with error: %d", ret2);
 			printf("from channel4_thread_m\n");
@@ -421,7 +424,7 @@ void test_init(int rat_id)
 	} else {
 		printf("Trying to start a thread\n");
 		ret1 = pthread_create(&thread1, NULL,
-				(void *)&channel3_thread, NULL);
+				(void *)&channel3_thread, (void *) &rat_id);
 		if (ret1) {
 			printf("pthread_create returns with error: %d", ret1);
 			printf("from channel3_thread\n");
@@ -429,7 +432,7 @@ void test_init(int rat_id)
 		}
 
 		ret2 = pthread_create(&thread2, NULL,
-				(void *)&channel4_thread, NULL);
+				(void *)&channel4_thread, (void *) &rat_id);
 		if (ret2) {
 			printf("pthread_create returns with error: %d", ret2);
 			printf("from channel4_thread\n");
@@ -439,14 +442,14 @@ void test_init(int rat_id)
 		printf("ptherad_create %d %d\n", ret1, ret2);
 	}
 
-	while (!(ch3init && ch4init)) {
+	while (!(ch3init[rat_id] && ch4init[rat_id])) {
 		mute_print(".");
 		usleep(1000);
 	}
 
 	if (mute_flag == 0)
 		printf("Trying to send message on ch#2\n");
-	ret = fsl_ipc_send_msg(2, buf, 10, ipc);
+	ret = fsl_ipc_send_msg(2, buf, 10, ipc[rat_id]);
 	if (ret)
 		printf("Issue with fsl_ipc_send_msg %d\n", ret);
 
