@@ -38,7 +38,7 @@ int main(int arg_c, char *argv[])
 		exit(-1);
 	}
 	FILE *fd_b = fopen(OUTPUT_BINARY_TXT, "wb");
-	if (fd == NULL) {
+	if (fd_b == NULL) {
 		printf("%s  open fail\n", OUTPUT_BINARY_TXT);
 		exit(-1);
 	}

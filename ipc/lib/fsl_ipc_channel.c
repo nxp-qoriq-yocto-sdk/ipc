@@ -1708,7 +1708,7 @@ void create_ioctl_thread(void *thread_arg)
 {
 	l1d_printf("Enter func %s\n", __func__);
 	fsl_defense_cb cb = thread_arg;
-	uint32_t ret = 0;
+	int ret = 0;
 	int dev_fsl_l1d = open("/dev/fsl_l1d", O_RDWR);
 
 	if (dev_fsl_l1d == -1) {

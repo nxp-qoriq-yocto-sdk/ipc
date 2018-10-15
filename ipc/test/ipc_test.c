@@ -75,7 +75,7 @@ int main(int argc, char **argv)
 	test_init(rat_id);
 	return 0;
 }
-///////////////// Create Channels ////////////////////
+/* ////////////////////// Create Channels //////////////////// */
 int isbitset(uint64_t v, int bit)
 {
 	if ((v >> (63 - bit)) & 0x1)

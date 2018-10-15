@@ -125,8 +125,8 @@ void channel67_thread(void *ptr)
 	ipc_userspace_t *ipc_priv;
 	int rat_id, loop_local = loop;
 
-        ipc_priv = (ipc_userspace_t *) ptr;
-        rat_id = ipc_priv->rat_id;
+	ipc_priv = (ipc_userspace_t *) ptr;
+	rat_id = ipc_priv->rat_id;
 
 	ENTER();
 	ret = fsl_ipc_configure_channel(7, depth, IPC_PTR_CH, 0, 0, NULL, ipc_priv);
@@ -215,7 +215,7 @@ void channel67_thread(void *ptr)
 
 		if (mute_flag == 1) {
 			loop_local--;
-			if(!loop_local)
+			if (!loop_local)
 				goto end;
 		}
 	}
