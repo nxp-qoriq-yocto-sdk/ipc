@@ -55,7 +55,7 @@ static void add_watchpoint()
 {
 	char wpt_t;
 	uint32_t cfg_wpt = 0;
-	uint32_t wpt_ID = 0;
+	int wpt_ID = 0;
 	uint32_t wpt_b = 0;
 	uint32_t wpt_e = 0;
 	char *s;
@@ -75,7 +75,7 @@ static void add_watchpoint()
 	while (cfg_wpt != 0) {
 
 		s = fgets(line, sizeof(line), stdin);
-		if (*s == '\n' || s == NULL || *s == '\r')
+		if (s == NULL || *s == '\n' || *s == '\r')
 			continue;
 
 		/* Space to accommodate 0x */
@@ -121,7 +121,7 @@ Proceed:
 static void add_dsp_safe_addr()
 {
 	uint32_t cfg_dsa = 0;
-	uint32_t dsa_ID = 0;
+	int dsa_ID = 0;
 	uint32_t dsa_v = 0;
 	char *s;
 	char line[256] = {0};
@@ -135,7 +135,7 @@ static void add_dsp_safe_addr()
 	while (cfg_dsa == 0) {
 
 		s = fgets(line, sizeof(line), stdin);
-		if (*s == '\n' || s == NULL || *s == '\r')
+		if (s == NULL || *s == '\n' || *s == '\r')
 			continue;
 
 		/* Space to accommodate 0x */
