@@ -84,7 +84,6 @@ int main(int argc, char **argv)
 	}
 
 	for (i = 0; i < num_rats; i++) {
-		printf("rat_id[i] %d\n", rat_id[i]);
 		int error_code;
 
 		error_code = pthread_create(&rat_thread[i], NULL, (void *)&test_init, &rat_id[i]);
@@ -110,6 +109,147 @@ int isbitset(uint64_t v, int bit)
 	return 0;
 }
 
+void channel67_thread_m(void *ptr)
+{
+	unsigned long p;
+	uint32_t len;
+	int ret, ch6send_ctr = 0;
+	int depth = 16;
+	int ctr, ch7recv_ctr = 0, rat_id;
+	int tr = 0, ts = 0, ts_dma = 0;
+	mem_range_t r;
+	sg_list_t lst;
+	void *vaddr;
+	int first = 1;
+	char fapi_msg[1020];
+	ipc_userspace_t *ipc_priv;
+
+	ipc_priv = (ipc_userspace_t *) ptr;
+	rat_id = ipc_priv->rat_id;
+
+	ret = fsl_ipc_configure_channel(7, depth, IPC_PTR_CH, 0, 0,
+						NULL, ipc_priv);
+	if (ret) {
+		printf("\n ret %d \n", ret);
+		EXIT(ret);
+		pthread_exit(0);
+	}
+
+	ch7init[rat_id] = 1;
+	r.size = 0x200000;
+	ret = fsl_usmmgr_alloc(&r, usmmgr);
+	if (ret) {
+		printf("\n Unable to allocate memory from shm_alloc \n");
+		EXIT(-1);
+		pthread_exit(0);
+	}
+	mute_print("range of free pool P=%llx V=%p S=%x\n", r.phys_addr,
+			r.vaddr, r.size);
+	ret = fsl_ipc_configure_txreq(6, r.phys_addr + 0x100000,
+						1024*2, ipc_priv);
+	if (ret) {
+		printf("\n Error in fsl_ipc_configure_txreq ret %d \n", ret);
+		goto end;
+	}
+	ctr = 1;
+	while (loop-- > 0) {
+		lst.entry[0].src_addr = r.phys_addr;
+		lst.entry[0].len = 1024;
+		lst.entry[0].is_valid = 1;
+		vaddr = fsl_usmmgr_p2v(lst.entry[0].src_addr, usmmgr);
+		if (!vaddr) {
+			ret = -ERR_NULL_VALUE;
+			printf("\nError in translating physical address %lx "
+					"to virtual address\n", lst.entry[0].src_addr);
+			goto end;
+		}
+		memset(vaddr, 0x11 + rat_id + ctr, 1024);
+		lst.entry[1].src_addr = r.phys_addr + 1024 * 16;
+		lst.entry[1].len = 1024;
+		lst.entry[1].is_valid = 1;
+		vaddr = fsl_usmmgr_p2v(lst.entry[1].src_addr, usmmgr);
+		if (!vaddr) {
+			ret = -ERR_NULL_VALUE;
+			printf("\nError in translating physical address %lx "
+				"to virtual address\n", lst.entry[1].src_addr);
+			goto end;
+		}
+		memset(vaddr, 0x22 + rat_id + ctr, 1024);
+		lst.entry[2].is_valid = 0;
+		/* vaddr = fsl_usmmgr_p2v(lst.entry[1].src_addr, usmmgr); */
+		memset(fapi_msg, rat_id + ctr, 1020);
+		do {
+			if (!first) {
+				ret = fsl_ipc_get_last_tx_req_status(
+								ipc_priv);
+				while (ret != TXREQ_DONE) {
+					usleep(10000);
+					ts_dma++;
+					if (ret == TXREQ_DONE ||
+						ret == TXREQ_IN_PROCESS)
+							ts_dma = 0;
+					else if (ts_dma == 100) {
+						/* wait for 1 sec*/
+						printf("Timed out DMA"
+							". errno on ch#6"
+							"is (%i)\n", ret);
+							pthread_exit(0);
+					}
+				}
+			}
+			ret =
+				fsl_ipc_send_tx_req(6, &lst, &fapi_msg, 1020,
+							ipc_priv);
+			usleep(10000);
+			first = 0;
+			ts++;
+			if (ret == ERR_SUCCESS)
+				ts = 0;
+			else if (ts == 100) {
+				/* wait for 1 sec*/
+				printf("Timed out. Not able to send"
+						" message on ch#6\n");
+				pthread_exit(0);
+			}
+		} while (ret == -ERR_CHANNEL_FULL);
+		if (ret) {
+			printf("\n ERROR ret %x \n", ret);
+			goto end;
+		}
+		ch6send_ctr++;
+
+		do {
+			ret = fsl_ipc_recv_ptr(7, &p, &len, ipc_priv);
+			usleep(1000);
+			tr++;
+			if (ret == ERR_SUCCESS)
+				tr = 0;
+			else if (tr == 500) {
+				/* wait for 0.5 sec*/
+				printf("Timed out. Message not received"
+							" on ch#7\n");
+				pthread_exit(0);
+			}
+		} while (ret == -ERR_CHANNEL_EMPTY);
+		if (ret) {
+			printf("\n ERROR ret %x \n", ret);
+			goto end;
+		}
+		ch7recv_ctr++;
+		ctr++;
+	}
+	if (ch7recv_ctr == ch6send_ctr && ch7recv_ctr != 0) {
+		printf("(%d) Msg Sent on ch#6\n", ch6send_ctr);
+		printf("(%d) Msg Recieved on ch#7\n", ch7recv_ctr);
+		printf("Success on ch#6-ch#7 pair\n");
+		pthread_exit(0);
+	} else
+		printf("failure on ch#6-ch#7 pair\n");
+
+ end:
+	pthread_exit(0);
+}
+
 void channel67_thread(void *ptr)
 {
 	unsigned long p;
@@ -123,7 +263,7 @@ void channel67_thread(void *ptr)
 	int first = 1;
 	char fapi_msg[1020];
 	ipc_userspace_t *ipc_priv;
-	int rat_id, loop_local = loop;
+	int rat_id;
 
 	ipc_priv = (ipc_userspace_t *) ptr;
 	rat_id = ipc_priv->rat_id;
@@ -212,12 +352,6 @@ void channel67_thread(void *ptr)
 		printf("\nR:C7:P:[%lx]L:%x\n", p, len);
 
 		ctr++;
-
-		if (mute_flag == 1) {
-			loop_local--;
-			if (!loop_local)
-				goto end;
-		}
 	}
 end:
 	printf("Exit from Thread for ch6/7\n");
@@ -282,12 +416,22 @@ void test_init(void *id)
 	}
 
 	printf("Trying to start a thread\n");
-	ret3 = pthread_create(&thread3, NULL,
-			(void *)&channel67_thread, (void *)ipc_priv);
-	if (ret3) {
-		printf("pthread_create returns with error: %d", ret3);
-		return;
+	if (mute_flag == 1) {
+		ret3 = pthread_create(&thread3, NULL,
+				(void *)&channel67_thread_m, (void *)ipc_priv);
+		if (ret3) {
+			printf("pthread_create returns with error: %d", ret3);
+			return;
+		}
+	} else {
+		ret3 = pthread_create(&thread3, NULL,
+				(void *)&channel67_thread, (void *)ipc_priv);
+		if (ret3) {
+			printf("pthread_create returns with error: %d", ret3);
+			return;
+		}
 	}
+
 	printf("ptherad_create %d\n", ret3);
 
 	while (!ch7init[rat_id]) {
